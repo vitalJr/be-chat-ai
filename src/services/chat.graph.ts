@@ -14,8 +14,11 @@
 
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import type { Message } from "../types.js";
-import { askOllamaChat } from "./ollama.service.js";
-import { searchRelevantChunks, buildContextFromChunks } from "./vectorstore.service.js";
+import { askOllamaChat } from "./ollama/ollama.service.js";
+import {
+  searchRelevantChunks,
+  buildContextFromChunks,
+} from "./vectorstore/vectorstore.service.js";
 
 // The graph's "state" is the data that flows between nodes. Each node
 // receives the current state and returns a PARTIAL state — only the
@@ -37,7 +40,9 @@ const ChatState = Annotation.Root({
 // buildContextFromChunks used to do inline inside the controller. Looks
 // at the last message (the user's question) and searches the vector
 // store for relevant chunks.
-async function retrieve(state: typeof ChatState.State): Promise<Partial<typeof ChatState.State>> {
+async function retrieve(
+  state: typeof ChatState.State,
+): Promise<Partial<typeof ChatState.State>> {
   const lastMessage = state.messages[state.messages.length - 1];
   const relevantChunks = await searchRelevantChunks(lastMessage.content);
   const extraContext = buildContextFromChunks(relevantChunks);
@@ -49,7 +54,9 @@ async function retrieve(state: typeof ChatState.State): Promise<Partial<typeof C
 
 // NODE 2: "generate" — sends the history + extra context to Ollama, the
 // same call askOllamaChat() the controller used to make directly.
-async function generate(state: typeof ChatState.State): Promise<Partial<typeof ChatState.State>> {
+async function generate(
+  state: typeof ChatState.State,
+): Promise<Partial<typeof ChatState.State>> {
   const reply = await askOllamaChat(state.messages, state.extraContext);
   return { reply };
 }

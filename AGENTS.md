@@ -97,12 +97,22 @@ file.
 ```bash
 npm start          # run the API (tsx, no build)
 npm run dev         # run with watch mode (restarts on file changes)
+npm run build       # compile to dist/ with tsc (not needed for day-to-day dev)
 npm run typecheck   # tsc --noEmit
+npm run lint        # eslint .
+npm test            # vitest run
 ```
 
-There's no automated test suite yet. To validate API changes, test
-manually with `curl` (examples in the README) against a local Ollama
-instance (`ollama serve`).
+Test coverage only reaches pure, dependency-free logic so far — no
+mocking setup exists yet for Ollama's `fetch` calls, LangChain's loaders,
+or Express request/response objects. Covered: `buildContextFromChunks`
+(`vectorstore.service.test.ts`), `conversation.store.ts`'s in-memory
+history operations, and `guessMimeType`
+(`document-loader.service.test.ts`). Everything that touches Ollama, the
+filesystem, or HTTP still relies on manual testing with `curl` (examples
+in the README) against a local Ollama instance
+(`ollama serve`). Add new `*.test.ts` files next to the code they cover
+as coverage grows.
 
 ## What to avoid
 

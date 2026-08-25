@@ -4,9 +4,9 @@
 // query the document during conversations.
 
 import type { Request, Response } from "express";
-import { listDocuments } from "../services/document.store.js";
-import { loadAndSplitDocument } from "../services/document-loader.service.js";
-import { addDocumentChunks } from "../services/vectorstore.service.js";
+import { listDocuments } from "../services/document/document.store.js";
+import { loadAndSplitDocument } from "../services/document/document-loader.service.js";
+import { addDocumentChunks } from "../services/vectorstore/vectorstore.service.js";
 
 // POST /api/documents  (multipart/form-data, "file" field)
 export async function handleUploadDocument(req: Request, res: Response) {
@@ -31,7 +31,10 @@ export async function handleUploadDocument(req: Request, res: Response) {
     await addDocumentChunks(chunks);
     indexed = true;
   } catch (error) {
-    indexError = error instanceof Error ? error.message : "Unknown error while processing the document.";
+    indexError =
+      error instanceof Error
+        ? error.message
+        : "Unknown error while processing the document.";
     console.error("Error indexing document:", indexError);
   }
 

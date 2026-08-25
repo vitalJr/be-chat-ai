@@ -11,7 +11,7 @@
 // in parallel (e.g. multiple browser tabs, or different users) without
 // mixing one's history with another's.
 
-import type { Message, Role } from "../types.js";
+import type { Message, Role } from "../../types.js";
 
 const conversations = new Map<string, Message[]>();
 
@@ -39,7 +39,11 @@ export function getHistory(conversationId: string): Message[] {
 /**
  * Adds a new message to a specific conversation's history.
  */
-export function addMessage(conversationId: string, role: Role, content: string): void {
+export function addMessage(
+  conversationId: string,
+  role: Role,
+  content: string,
+): void {
   const history = getOrCreateHistory(conversationId);
   history.push({ role, content });
 }
@@ -56,6 +60,9 @@ export function clearHistory(conversationId: string): void {
  * Replaces a conversation's entire history with a new list of messages.
  * Used, for example, to swap old messages for a summary.
  */
-export function setHistory(conversationId: string, newHistory: Message[]): void {
+export function setHistory(
+  conversationId: string,
+  newHistory: Message[],
+): void {
   conversations.set(conversationId, newHistory);
 }
