@@ -27,10 +27,14 @@ describe("conversation.store", () => {
 
   it("keeps each conversationId's history isolated from the others", () => {
     addMessage("alice", "user", "message from alice");
-    addMessage("bruno", "user", "message from bruno");
+    addMessage("bruno", "user", "message from brun2");
 
-    expect(getHistory("alice")).toEqual([{ role: "user", content: "message from alice" }]);
-    expect(getHistory("bruno")).toEqual([{ role: "user", content: "message from bruno" }]);
+    expect(getHistory("alice")).toEqual([
+      { role: "user", content: "message from alice" },
+    ]);
+    expect(getHistory("bruno")).toEqual([
+      { role: "user", content: "message from bruno" },
+    ]);
   });
 
   it("clearHistory empties only the given conversation", () => {
@@ -40,7 +44,9 @@ describe("conversation.store", () => {
     clearHistory("to-clear");
 
     expect(getHistory("to-clear")).toEqual([]);
-    expect(getHistory("untouched")).toEqual([{ role: "user", content: "should survive" }]);
+    expect(getHistory("untouched")).toEqual([
+      { role: "user", content: "should survive" },
+    ]);
   });
 
   it("setHistory replaces the entire history", () => {
@@ -48,6 +54,8 @@ describe("conversation.store", () => {
 
     setHistory("to-replace", [{ role: "system", content: "summary" }]);
 
-    expect(getHistory("to-replace")).toEqual([{ role: "system", content: "summary" }]);
+    expect(getHistory("to-replace")).toEqual([
+      { role: "system", content: "summary" },
+    ]);
   });
 });
