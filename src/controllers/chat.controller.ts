@@ -6,7 +6,6 @@
 
 import type { Request, Response } from "express";
 import {
-  askOllamaChat,
   askOllamaChatStream,
   summarizeConversation,
 } from "../services/ollama.service.js";
@@ -20,6 +19,7 @@ import {
   searchRelevantChunks,
   buildContextFromChunks,
 } from "../services/vectorstore.service.js";
+import { chatGraph } from "../services/chat.graph.js";
 
 // Once history passes this number of messages, the oldest ones get summarized
 const MAX_MESSAGES_BEFORE_SUMMARY = 10;
@@ -67,19 +67,19 @@ export async function handleChat(
     // 1) Store the user's question in THIS conversation's history
     addMessage(conversationId, "user", message);
 
-    // 2) Search the uploaded documents for the chunks most relevant to
-    //    this question (RAG). If nothing has been uploaded yet, this changes nothing.
-    const relevantChunks = await searchRelevantChunks(message);
-    const extraContext = buildContextFromChunks(relevantChunks);
+    // 2) Run the retrieve -> generate graph (see chat.graph.ts) over this
+    //    conversation's ENTIRE history. The graph handles both searching
+    //    the uploaded documents for relevant chunks (RAG) and asking
+    //    Ollama for a reply — the same two steps this controller used to
+    //    call directly, now expressed as an explicit graph instead of
+    //    two separate function calls.
+    const result = await chatGraph.invoke({ messages: getHistory(conversationId) });
+    const reply = result.reply;
 
-    // 3) Send this conversation's ENTIRE history (not just the last
-    //    message) to Ollama, so it has context of what's already been discussed + the documents
-    const reply = await askOllamaChat(getHistory(conversationId), extraContext);
-
-    // 4) Store the AI's response too, so it enters the context of the next question
+    // 3) Store the AI's response too, so it enters the context of the next question
     addMessage(conversationId, "assistant", reply);
 
-    // 5) If the history is already large, summarize the oldest messages
+    // 4) If the history is already large, summarize the oldest messages
     //    (this happens "after" responding, so it doesn't make the user wait)
     await summarizeHistoryIfNeeded(conversationId);
 
