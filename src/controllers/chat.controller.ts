@@ -8,17 +8,17 @@ import type { Request, Response } from "express";
 import {
   askOllamaChatStream,
   summarizeConversation,
-} from "../services/ollama.service.js";
+} from "../services/ollama/ollama.service.js";
 import {
   getHistory,
   addMessage,
   clearHistory,
   setHistory,
-} from "../services/conversation.store.js";
+} from "../services/conversation/conversation.store.js";
 import {
   searchRelevantChunks,
   buildContextFromChunks,
-} from "../services/vectorstore.service.js";
+} from "../services/vectorstore/vectorstore.service.js";
 import { chatGraph } from "../services/chat.graph.js";
 
 // Once history passes this number of messages, the oldest ones get summarized
@@ -73,7 +73,9 @@ export async function handleChat(
     //    Ollama for a reply — the same two steps this controller used to
     //    call directly, now expressed as an explicit graph instead of
     //    two separate function calls.
-    const result = await chatGraph.invoke({ messages: getHistory(conversationId) });
+    const result = await chatGraph.invoke({
+      messages: getHistory(conversationId),
+    });
     const reply = result.reply;
 
     // 3) Store the AI's response too, so it enters the context of the next question
@@ -167,7 +169,10 @@ async function summarizeHistoryIfNeeded(conversationId: string): Promise<void> {
   const summary = await summarizeConversation(oldMessages);
 
   setHistory(conversationId, [
-    { role: "system", content: `Summary of the conversation so far: ${summary}` },
+    {
+      role: "system",
+      content: `Summary of the conversation so far: ${summary}`,
+    },
     ...recentMessages,
   ]);
 }

@@ -10,7 +10,7 @@
 //    live at the root level of the body (not inside an "options" object)
 // 4) The response comes in data.choices[0].message.content (not data.response)
 
-import { config } from "../config/env.js";
+import { config } from "../../config/env.js";
 
 interface OpenAIChatResponse {
   choices: { message: { content: string } }[];

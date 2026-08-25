@@ -33,6 +33,22 @@ const splitter = new RecursiveCharacterTextSplitter({
 });
 
 /**
+ * Guesses a file's MIME type from its extension. Used when reindexing
+ * files already sitting in uploads/ at startup — there's no multipart
+ * request there to read a real Content-Type from, only a filename.
+ * Returns undefined for anything that isn't a recognized extension.
+ */
+export function guessMimeType(fileName: string): string | undefined {
+  const extension = fileName.toLowerCase().split(".").pop();
+
+  if (extension === "pdf") return PDF_MIME_TYPE;
+  if (extension === "docx") return DOCX_MIME_TYPE;
+  if (extension === "doc") return DOC_MIME_TYPE;
+
+  return undefined;
+}
+
+/**
  * Reads a file saved on disk, extracts the text, and splits it into
  * smaller pieces, ready to become embeddings.
  * @param filePath - full path of the file on disk

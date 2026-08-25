@@ -13,7 +13,7 @@
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import type { Document } from "@langchain/core/documents";
-import { config } from "../config/env.js";
+import { config } from "../../config/env.js";
 
 // OllamaEmbeddings is a DIFFERENT model from the chat model — specialized
 // in turning text into vectors, not in generating responses.

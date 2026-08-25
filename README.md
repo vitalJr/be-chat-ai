@@ -144,13 +144,14 @@ Just like the conversation history, this index lives **in memory** —
 restarting the server wipes what's already been indexed (the files stay
 in `uploads/`, but would need to be re-uploaded to become queryable again).
 
-## Type-checking
+## Type-checking, linting, tests, and build
 
 ```bash
-npm run typecheck
+npm run typecheck   # TypeScript compiler, checking types only (--noEmit)
+npm run lint        # ESLint over the project's source
+npm test            # runs the test suite (Vitest)
+npm run build       # compiles to dist/ with tsc, for running without tsx
 ```
-Runs the TypeScript compiler just to check for type errors, without
-generating any file (`--noEmit`).
 
 ## Switching the model
 

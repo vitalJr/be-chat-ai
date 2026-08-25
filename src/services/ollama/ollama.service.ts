@@ -4,8 +4,8 @@
 // understand and swap the AI later (e.g. replacing Ollama with another
 // API) by touching a single place.
 
-import { config } from "../config/env.js";
-import type { Message } from "../types.js";
+import { config } from "../../config/env.js";
+import type { Message } from "../../types.js";
 
 // Default system prompt: fixed instructions that apply to every
 // conversation, sent along with every request (not part of the visible history).
