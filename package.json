@@ -1,0 +1,34 @@
+{
+  "name": "ollama-chat-api",
+  "version": "1.0.0",
+  "description": "API simples em Node.js/Express + TypeScript que envia mensagens para o Ollama (IA local e gratuita)",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/classic": "^1.0.42",
+    "@langchain/community": "^1.1.29",
+    "@langchain/core": "^1.2.7",
+    "@langchain/ollama": "^1.3.0",
+    "@langchain/textsplitters": "^1.0.1",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mammoth": "^1.12.1",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5",
+    "word-extractor": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}
