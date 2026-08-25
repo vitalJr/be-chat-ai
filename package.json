@@ -13,6 +13,7 @@
     "@langchain/classic": "^1.0.42",
     "@langchain/community": "^1.1.29",
     "@langchain/core": "^1.2.7",
+    "@langchain/langgraph": "^1.4.12",
     "@langchain/ollama": "^1.3.0",
     "@langchain/textsplitters": "^1.0.1",
     "cors": "^2.8.6",
