@@ -20,7 +20,7 @@ const SYSTEM_PROMPT =
 const chatModel = new ChatOllama({
   model: config.ollamaModel,
   baseUrl: config.ollamaUrl,
-  temperature: 0.7,
+  temperature: 0.3,
   numPredict: config.ollamaMaxTokens,
   numCtx: config.ollamaMaxContext,
 });
@@ -45,17 +45,25 @@ function buildSystemMessages(extraContext?: string): BaseMessage[] {
 
 function extractText(content: AIMessage["content"]): string {
   if (typeof content !== "string") {
-    throw new Error("Expected a plain text response from the model, got a non-text message.");
+    throw new Error(
+      "Expected a plain text response from the model, got a non-text message.",
+    );
   }
   return content;
 }
 
 export async function askOllama(prompt: string): Promise<string> {
-  const result = await chatModel.invoke([new SystemMessage(SYSTEM_PROMPT), new HumanMessage(prompt)]);
+  const result = await chatModel.invoke([
+    new SystemMessage(SYSTEM_PROMPT),
+    new HumanMessage(prompt),
+  ]);
   return extractText(result.content);
 }
 
-export async function askOllamaChat(messages: Message[], extraContext?: string): Promise<string> {
+export async function askOllamaChat(
+  messages: Message[],
+  extraContext?: string,
+): Promise<string> {
   const result = await chatModel.invoke([
     ...buildSystemMessages(extraContext),
     ...toLangChainMessages(messages),
@@ -87,7 +95,9 @@ export async function askOllamaChatStream(
   return fullText;
 }
 
-export async function summarizeConversation(messages: Message[]): Promise<string> {
+export async function summarizeConversation(
+  messages: Message[],
+): Promise<string> {
   const conversationText = messages
     .map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.content}`)
     .join("\n");

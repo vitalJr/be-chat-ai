@@ -3,12 +3,14 @@ import { documentAssistantAgent } from "../agents/document-assistant.agent.js";
 import { generalAssistantAgent } from "../agents/general-assistant.agent.js";
 import { translatorAgent } from "../agents/translator.agent.js";
 import { veterinaryAssistantAgent } from "../agents/veterinary-assistant.agent.js";
+import { webSearchAgent } from "../agents/web-search.agent.js";
 
 const REGISTERED_AGENTS: AgentDefinition[] = [
   documentAssistantAgent,
   generalAssistantAgent,
   translatorAgent,
   veterinaryAssistantAgent,
+  webSearchAgent,
 ];
 
 export const DEFAULT_AGENT_ID = documentAssistantAgent.id;

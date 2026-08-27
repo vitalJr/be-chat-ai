@@ -11,6 +11,7 @@ const embeddings = new OllamaEmbeddings({
 const vectorStore = new MemoryVectorStore(embeddings);
 
 const MIN_RELEVANCE_SCORE = 0.5;
+const MAX_CANDIDATES_TO_SCORE = 1000;
 
 const DOCUMENT_EMBEDDING_PREFIX = "search_document: ";
 const QUERY_EMBEDDING_PREFIX = "search_query: ";
@@ -25,16 +26,31 @@ export async function addDocumentChunks(chunks: Document[]): Promise<void> {
 
 export async function searchRelevantChunks(
   query: string,
-  k = 3,
+  k = 2,
 ): Promise<Document[]> {
   const queryVector = await embeddings.embedQuery(
     `${QUERY_EMBEDDING_PREFIX}${query}`,
   );
-  const scoredChunks = await vectorStore.similaritySearchVectorWithScore(queryVector, k);
+  const scoredChunks = await vectorStore.similaritySearchVectorWithScore(
+    queryVector,
+    MAX_CANDIDATES_TO_SCORE,
+  );
 
-  return scoredChunks
-    .filter(([, score]) => score >= MIN_RELEVANCE_SCORE)
-    .map(([chunk]) => chunk);
+  const relevantChunksBySource = new Map<string, Document[]>();
+
+  for (const [chunk, score] of scoredChunks) {
+    if (score < MIN_RELEVANCE_SCORE) continue;
+
+    const source = String(chunk.metadata.source ?? "unknown");
+    const chunksForSource = relevantChunksBySource.get(source) ?? [];
+
+    if (chunksForSource.length < k) {
+      chunksForSource.push(chunk);
+      relevantChunksBySource.set(source, chunksForSource);
+    }
+  }
+
+  return Array.from(relevantChunksBySource.values()).flat();
 }
 
 export function buildContextFromChunks(chunks: Document[]): string | undefined {
@@ -52,6 +68,13 @@ export function buildContextFromChunks(chunks: Document[]): string | undefined {
     "user, to help answer — but ONLY if it's relevant to the question " +
     "asked. If it's unrelated, ignore it and answer normally using your " +
     "own knowledge.\n\n" +
+    "<steps_to_follow>\n" +
+    "When the answer is found in a document below, tell the user which " +
+    "document it came from and quote the relevant excerpt verbatim.\n" +
+    "</steps_to_follow>\n\n" +
+    "<response_format_example>\n" +
+    'According to the document "<source>", the answer is: "<exact quoted excerpt>".\n' +
+    "</response_format_example>\n\n" +
     formatted
   );
 }

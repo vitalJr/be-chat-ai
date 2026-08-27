@@ -33,10 +33,12 @@ ollama-chat-api/
 │   │   └── rate-limit.middleware.ts # Caps requests per IP
 │   ├── agents/                     # One file per agent — see "Agents" below
 │   │   ├── agent.types.ts          # The AgentDefinition contract every agent implements
+│   │   ├── tool-calling-graph.ts   # Shared generate<->tools loop, reused by any agent that needs tools
 │   │   ├── document-assistant.agent.ts  # RAG: searches your documents before answering
 │   │   ├── general-assistant.agent.ts   # Plain chat, no document search
 │   │   ├── translator.agent.ts          # Persona-only agent: always replies in English
-│   │   └── veterinary-assistant.agent.ts # Persona-only agent: pet health & care
+│   │   ├── veterinary-assistant.agent.ts # Pet health & care, searches the web as a fallback
+│   │   └── web-search.agent.ts          # Searches the web (SerpAPI) when it needs to
 │   └── services/
 │       ├── agent-registry.ts       # Catalog of every registered agent
 │       ├── ollama/
@@ -130,7 +132,8 @@ Currently registered:
 | `document-assistant` (default) | Searches your uploaded documents for relevant context before answering (RAG). Falls back to plain chat when nothing relevant is found. |
 | `general-assistant` | Plain chat, no document search — answers only from the model's own knowledge. |
 | `translator` | Translates whatever you write into English, ignoring everything else the message asks for. |
-| `veterinary-assistant` | Answers questions about pet health, nutrition, behavior, and care. |
+| `veterinary-assistant` | Answers questions about pet health, nutrition, behavior, and care. Searches the web when it isn't confident in its own answer. |
+| `web-search` | Searches the web (SerpAPI) when it needs current or specific information to answer. |
 
 Example:
 ```bash
@@ -145,6 +148,31 @@ the behavior before agents existed. An unknown `agentId` returns `400`.
 **Adding a new agent**: create a file in `src/agents/` exporting an
 `AgentDefinition`, then list it in `REGISTERED_AGENTS` in
 `src/services/agent-registry.ts`. Nothing else needs to change.
+
+## Tool calling (web search)
+
+`web-search` and `veterinary-assistant` can call a real tool — a web
+search via [SerpAPI](https://serpapi.com) — instead of only answering
+from what the model already knows. The model itself decides, per
+message, whether it needs to search or can answer directly; there's no
+code forcing the tool to run.
+
+This needs two things `.env` doesn't set by default:
+
+- **`OLLAMA_TOOL_MODEL`** — the plain `OLLAMA_MODEL` (`llama3` by
+  default) doesn't reliably support tool calling. Pull a model that does
+  (e.g. `ollama pull llama3.2`) and set `OLLAMA_TOOL_MODEL=llama3.2`.
+- **`SERPAPI_API_KEY`** — free tier available at
+  [serpapi.com](https://serpapi.com), key at
+  [serpapi.com/manage-api-key](https://serpapi.com/manage-api-key).
+  Without it, these two agents return an error when called; every other
+  agent keeps working normally.
+
+The tool-calling loop itself (ask the model → run the tool if it asked
+for one → ask again with the result → repeat until it answers) lives
+once in `src/agents/tool-calling-graph.ts`, as `buildToolCallingGraph(tools)`.
+Any agent that needs tools calls this with its own list of tools instead
+of reimplementing the loop.
 
 ## Multiple conversations
 
@@ -194,11 +222,14 @@ When you upload a document, besides saving it in `uploads/`, the backend:
 Every time you send a message to `/api/chat` (via the `document-assistant`
 agent) or `/api/chat/stream`, the backend embeds your question (prefixed
 with `"search_query: "`) and searches the index for the document chunks
-most *semantically* similar to it (this isn't keyword search!). Chunks
-below a relevance threshold are discarded, so unrelated documents don't
-add noise to unrelated questions. Whatever's left gets injected as extra
-context before asking Ollama. If no document was uploaded, or nothing
-relevant is found, the chat works normally, with no difference.
+most *semantically* similar to it (this isn't keyword search!). The
+search runs **per document**, not globally — each uploaded file gets its
+own chance to contribute relevant chunks, so a large document can't
+crowd out a smaller, more relevant one just by having far more chunks.
+Chunks below a relevance threshold are discarded, so unrelated documents
+don't add noise to unrelated questions. Whatever's left gets injected as
+extra context before asking Ollama. If no document was uploaded, or
+nothing relevant is found, the chat works normally, with no difference.
 
 This is called **RAG (Retrieval-Augmented Generation)**: instead of only
 relying on what the model "memorized" during training, we search for
@@ -240,8 +271,10 @@ four on every pull request into `main`.
 ## Switching the model
 
 Edit `.env` and change `OLLAMA_MODEL` to any chat model you've pulled
-(e.g. `mistral`, `phi3`, `gemma`), or `OLLAMA_EMBEDDING_MODEL` to switch
-the model used for document search. `OLLAMA_MAX_TOKENS` and
-`OLLAMA_MAX_CONTEXT` let you cap, respectively, how long a reply can be
-and how much text (history + RAG context + question) the model can see
-at once — see `.env.example` for details.
+(e.g. `mistral`, `phi3`, `gemma`), `OLLAMA_TOOL_MODEL` to change which
+model the tool-calling agents use (see "Tool calling" above — it must
+support tool calling), or `OLLAMA_EMBEDDING_MODEL` to switch the model
+used for document search. `OLLAMA_MAX_TOKENS` and `OLLAMA_MAX_CONTEXT`
+let you cap, respectively, how long a reply can be and how much text
+(history + RAG context + question) the model can see at once — see
+`.env.example` for details.

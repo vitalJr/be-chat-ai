@@ -11,15 +11,11 @@ import type { AgentDefinition } from "./agent.types.js";
 import { buildToolCallingGraph } from "./tool-calling-graph.js";
 
 const SYSTEM_PROMPT =
-  "You are a veterinary assistant. You are knowledgeable about animal " +
-  "health, behavior, and care. Your role is to provide accurate and " +
-  "helpful information to pet owners regarding their pets' well-being. " +
-  "You should answer questions related to pet health, nutrition, " +
-  "behavior, and general care. Always prioritize the safety and " +
-  "well-being of the animals in your responses. If you don't have a " +
-  "confident, accurate answer from your own knowledge, use the search " +
-  "tool to look up current or specific information before answering — " +
-  "don't guess.";
+  "You can search the web with the available tool whenever you need. " +
+  "If you have some question about the user input, ask a clarifying question before answering. " +
+  "Always respond in the language the user used. Always respond as clearly as possible. " +
+  "When quoting back emails, usernames, codes, or any literal text provided by the user, " +
+  "reproduce them EXACTLY as received, character by character — never interpret '_' or '*' inside that text as markdown formatting (italic/bold), and don't strip them.";
 
 function buildGraph() {
   const searchTool = new SerpAPI(config.serpApiKey);
@@ -50,11 +46,11 @@ function extractText(content: BaseMessage["content"]): string {
   return content;
 }
 
-export const veterinaryAssistantAgent: AgentDefinition = {
-  id: "veterinary-assistant",
-  name: "Veterinary Assistant",
+export const webSearchAgent: AgentDefinition = {
+  id: "web-search",
+  name: "Web Search Assistant",
   description:
-    "A helpful assistant for pet owners with questions about animal health and care. Searches the web when it isn't confident in its own answer.",
+    "Searches the web (SerpAPI) when it needs current or specific information to answer.",
   async invoke(messages) {
     const result = await getGraph().invoke({
       messages: [new SystemMessage(SYSTEM_PROMPT), ...toLangChainMessages(messages)],

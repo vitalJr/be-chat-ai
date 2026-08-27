@@ -4,11 +4,13 @@ export interface AppConfig {
   port: number;
   ollamaUrl: string;
   ollamaModel: string;
+  ollamaToolModel: string;
   ollamaEmbeddingModel: string;
   ollamaMaxContext: number | undefined;
   ollamaMaxTokens: number | undefined;
   openaiApiKey: string;
   openaiModel: string;
+  serpApiKey: string;
 }
 
 export const config: AppConfig = {
@@ -17,6 +19,8 @@ export const config: AppConfig = {
   ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
 
   ollamaModel: process.env.OLLAMA_MODEL || "llama3",
+
+  ollamaToolModel: process.env.OLLAMA_TOOL_MODEL || "llama3.2",
 
   ollamaMaxTokens: process.env.OLLAMA_MAX_TOKENS
     ? Number(process.env.OLLAMA_MAX_TOKENS)
@@ -31,4 +35,6 @@ export const config: AppConfig = {
 
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+
+  serpApiKey: process.env.SERPAPI_API_KEY || "",
 };
