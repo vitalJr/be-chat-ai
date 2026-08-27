@@ -1,7 +1,3 @@
-// Smoke test for buildContextFromChunks: it's a pure function (no Ollama
-// call, no I/O), so it's the easiest piece of RAG logic to test in
-// isolation. Sets up the Vitest wiring for the rest of the project — more
-// tests can be added the same way as coverage grows.
 import { describe, expect, it } from "vitest";
 import type { Document } from "@langchain/core/documents";
 import { buildContextFromChunks } from "./vectorstore.service.js";

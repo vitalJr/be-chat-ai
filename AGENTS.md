@@ -37,23 +37,6 @@ When adding a new feature, follow this same chain — don't skip layers
 - Run `npm run typecheck` before considering a change done — there's no
   build step in day-to-day use (`tsx` runs the `.ts` directly).
 
-## Comments
-
-The code is heavily commented **in english**, explaining **why**, not
-**what**:
-
-- File header: 2-4 lines explaining that file's role in the architecture
-  (what it does and what it does **not** do).
-- JSDoc (`/** ... */` with `@param`) on every function a service exports.
-- Inline comments on non-obvious decisions (e.g. why a limit exists, why
-  an order of operations matters, a known limitation).
-- Avoid redundant comments that just restate the function/variable name.
-
-When adding new code, keep this same comment style **in english** — it
-matches the rest of the codebase and is part of the project's purpose, not
-something to trim away. This file (AGENTS.md) is the exception, kept in
-English on request.
-
 ## Naming
 
 - Controllers export `handleX` functions (`handleChat`, `handleUploadDocument`).
@@ -76,12 +59,19 @@ English on request.
   still considered a success even if indexing fails, returning
   `indexed: false` + `indexError`.
 
+## Comments
+
+The codebase has **no comments** — every `.ts` file is comment-free by
+design, code included. Don't add `//`, `/* */`, or JSDoc back in when
+writing or editing code here, even to explain something non-obvious;
+keep it in the PR description, commit message, or conversation instead.
+Naming should carry as much of the "what" as possible on its own.
+
 ## In-memory state
 
 `conversation.store.ts` and `vectorstore.service.ts` hold state in a
 `Map`/object in process memory — **not** in a database. This is
-intentional for the project's current stage, and is documented as a
-limitation in each file's comments (restarting the server wipes
+intentional for the project's current stage (restarting the server wipes
 everything). If real persistence is ever added, that's a deliberate
 architecture change — don't bundle it with smaller unrelated changes.
 
@@ -120,7 +110,6 @@ as coverage grows.
   layers) beyond what already exists — the project is intentionally simple.
 - Don't swap the in-memory `MemoryVectorStore`/`Map` for a real database
   "in passing" — that's an architecture decision, discuss it first.
-- Don't strip the explanatory comments when refactoring; adapt the comment
-  to the new version of the code instead.
+- Don't add comments back into the code — see "Comments" above.
 - Don't commit `.env`, `uploads/`, or `dist/` (already covered by
   `.gitignore`).

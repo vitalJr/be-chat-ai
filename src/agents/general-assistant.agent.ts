@@ -1,7 +1,3 @@
-// The simplest possible agent: a single "generate" node, no document
-// search at all. Exists mainly to prove the agent format actually
-// supports different graph shapes, not just different prompts — this one
-// has one node instead of document-assistant's two, and no "retrieve" step.
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import type { Message } from "../types.js";
 import type { AgentDefinition } from "./agent.types.js";

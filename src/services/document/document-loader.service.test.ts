@@ -1,6 +1,3 @@
-// guessMimeType is a pure function (just string matching on a file
-// extension) — the only piece of document-loader.service.ts that's
-// testable without a real PDF/DOC/DOCX file and a LangChain loader.
 import { describe, expect, it } from "vitest";
 import { guessMimeType } from "./document-loader.service.js";
 

@@ -1,10 +1,3 @@
-// A persona-only agent: same single-node shape as general-assistant.ts
-// (no RAG, no extra steps) — the only thing that differs is a fixed
-// instruction handed to askOllamaChat via its "extraContext" parameter.
-// That parameter is named after its original RAG use case
-// (document-assistant.agent.ts uses it for retrieved chunks), but
-// ollama.service.ts just treats it as "one more system message" — so
-// it's equally valid for baking in a persona/task like this one.
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import type { Message } from "../types.js";
 import type { AgentDefinition } from "./agent.types.js";

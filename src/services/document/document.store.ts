@@ -1,7 +1,3 @@
-// "Service" layer: deals with what's already saved in the uploads folder.
-// The controller doesn't touch the filesystem directly — it asks this
-// service, the same way we ask ollama.service.js to talk to Ollama.
-
 import fs from "node:fs";
 import path from "node:path";
 import { UPLOADS_DIR } from "../../config/uploads.js";
@@ -14,10 +10,6 @@ export interface StoredDocument {
   uploadedAt: string;
 }
 
-/**
- * Lists every document saved in the uploads folder, with name, size,
- * and the date it was saved.
- */
 export function listDocuments(): StoredDocument[] {
   const fileNames = fs.readdirSync(UPLOADS_DIR);
 
@@ -32,25 +24,10 @@ export function listDocuments(): StoredDocument[] {
   });
 }
 
-// upload.middleware.ts saves files as "<timestamp>-<original name>" to
-// avoid collisions. Reverses that so the reindexed document's "source"
-// metadata shows the human-readable name, not the disk filename.
 function extractOriginalName(storedFileName: string): string {
   return storedFileName.replace(/^\d+-/, "");
 }
 
-/**
- * Re-reads and re-indexes every document already sitting in uploads/,
- * rebuilding the in-memory vector store (see vectorstore.service.ts)
- * after a restart wipes it. The files on disk always survive a
- * restart — only the searchable index doesn't, so this is what makes
- * previously uploaded documents queryable again without re-uploading
- * them by hand. Meant to run once, at startup (see index.ts).
- *
- * Skips any file whose type it doesn't recognize, and logs (without
- * throwing) if a specific file fails to process, so one bad file
- * doesn't stop the rest from being indexed.
- */
 export async function reindexExistingDocuments(): Promise<void> {
   const fileNames = fs.readdirSync(UPLOADS_DIR);
   let reindexedCount = 0;

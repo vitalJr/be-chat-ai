@@ -1,7 +1,3 @@
-// conversation.store.ts is pure in-memory logic (a Map), no I/O and no
-// external services — straightforward to test in isolation. The store is
-// a module-level singleton, so each test below uses its own unique
-// conversationId to avoid leaking state between tests.
 import { describe, expect, it } from "vitest";
 import {
   addMessage,

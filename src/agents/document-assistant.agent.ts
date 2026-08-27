@@ -1,10 +1,3 @@
-// This is the RAG agent: before answering, it searches the documents
-// uploaded via /api/documents for chunks relevant to the question (see
-// vectorstore.service.ts) and hands them to Ollama as extra context.
-// Previously this graph lived directly in chat.controller.ts's only code
-// path; now it's one agent among possibly many, registered in
-// agent-registry.ts and selectable via ?agentId=document-assistant.
-
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import type { Message } from "../types.js";
 import type { AgentDefinition } from "./agent.types.js";

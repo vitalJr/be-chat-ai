@@ -1,9 +1,4 @@
-// This file is responsible for centralizing the application's configuration.
-// The idea is: instead of scattering "process.env.SOMETHING" across the
-// whole codebase, we read everything here ONCE and export it as a simple,
-// typed object.
-
-import "dotenv/config"; // loads variables from the .env file into process.env
+import "dotenv/config";
 
 export interface AppConfig {
   port: number;
@@ -19,16 +14,10 @@ export interface AppConfig {
 export const config: AppConfig = {
   port: process.env.PORT ? Number(process.env.PORT) : 3000,
 
-  // Default Ollama URL when it's installed locally
   ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
 
-  // Model used for chat calls (e.g. llama3, mistral, phi3...)
   ollamaModel: process.env.OLLAMA_MODEL || "llama3",
 
-  // Maximum number of tokens the model is allowed to generate per reply
-  // (Ollama's "num_predict"). undefined by default — Ollama then falls
-  // back to its own default (model-dependent, often unbounded until it
-  // decides to stop on its own), so this only takes effect if you set it.
   ollamaMaxTokens: process.env.OLLAMA_MAX_TOKENS
     ? Number(process.env.OLLAMA_MAX_TOKENS)
     : undefined,
@@ -37,14 +26,9 @@ export const config: AppConfig = {
     ? Number(process.env.OLLAMA_MAX_CONTEXT)
     : 4096,
 
-  // Model specialized in generating text embeddings (vectors), used for
-  // document search (RAG). Different from the chat model.
-  // Must be pulled beforehand: `ollama pull nomic-embed-text`
   ollamaEmbeddingModel:
     process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
 
-  // --- Example config for comparison with OpenAI (paid) ---
-  // The key is secret: it only lives in .env, never in code or in git.
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
 };
