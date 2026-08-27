@@ -1,22 +1,8 @@
-// This is the heart of RAG (Retrieval-Augmented Generation): a "search
-// index by meaning". Each document chunk becomes a vector of numbers
-// (embedding) that represents its meaning. When the user asks something,
-// we turn the question into the same kind of vector and look for the
-// document chunks with the most SIMILAR vectors — this isn't keyword
-// search, it's search by meaning.
-//
-// Just like conversation.store.ts, this lives in memory: restarting the
-// server wipes the index (the files stay saved in uploads/, but would
-// need to be reprocessed). To persist it for real, you'd swap
-// MemoryVectorStore for a real vector store (e.g. Chroma, pgvector).
-
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import type { Document } from "@langchain/core/documents";
 import { config } from "../../config/env.js";
 
-// OllamaEmbeddings is a DIFFERENT model from the chat model — specialized
-// in turning text into vectors, not in generating responses.
 const embeddings = new OllamaEmbeddings({
   model: config.ollamaEmbeddingModel,
   baseUrl: config.ollamaUrl,
@@ -24,32 +10,33 @@ const embeddings = new OllamaEmbeddings({
 
 const vectorStore = new MemoryVectorStore(embeddings);
 
-/**
- * Adds pieces (chunks) of an already-loaded document to the search index.
- * Under the hood, generates an embedding for each chunk.
- */
+const MIN_RELEVANCE_SCORE = 0.5;
+
+const DOCUMENT_EMBEDDING_PREFIX = "search_document: ";
+const QUERY_EMBEDDING_PREFIX = "search_query: ";
+
 export async function addDocumentChunks(chunks: Document[]): Promise<void> {
-  await vectorStore.addDocuments(chunks);
+  const prefixedTexts = chunks.map(
+    (chunk) => `${DOCUMENT_EMBEDDING_PREFIX}${chunk.pageContent}`,
+  );
+  const vectors = await embeddings.embedDocuments(prefixedTexts);
+  await vectorStore.addVectors(vectors, chunks);
 }
 
-/**
- * Searches for the document chunks most similar (semantically) to the
- * user's question. If no document has been uploaded yet, returns an
- * empty list — no error.
- */
 export async function searchRelevantChunks(
   query: string,
   k = 3,
 ): Promise<Document[]> {
-  return vectorStore.similaritySearch(query, k);
+  const queryVector = await embeddings.embedQuery(
+    `${QUERY_EMBEDDING_PREFIX}${query}`,
+  );
+  const scoredChunks = await vectorStore.similaritySearchVectorWithScore(queryVector, k);
+
+  return scoredChunks
+    .filter(([, score]) => score >= MIN_RELEVANCE_SCORE)
+    .map(([chunk]) => chunk);
 }
 
-/**
- * Builds a block of text with the relevant chunks, ready to be injected
- * as extra context in a call to Ollama. Returns undefined if there's
- * nothing relevant — this way the chat keeps working normally for
- * whoever hasn't uploaded any document.
- */
 export function buildContextFromChunks(chunks: Document[]): string | undefined {
   if (chunks.length === 0) return undefined;
 
