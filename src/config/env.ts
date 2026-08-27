@@ -10,6 +10,8 @@ export interface AppConfig {
   ollamaUrl: string;
   ollamaModel: string;
   ollamaEmbeddingModel: string;
+  ollamaMaxContext: number | undefined;
+  ollamaMaxTokens: number | undefined;
   openaiApiKey: string;
   openaiModel: string;
 }
@@ -23,10 +25,23 @@ export const config: AppConfig = {
   // Model used for chat calls (e.g. llama3, mistral, phi3...)
   ollamaModel: process.env.OLLAMA_MODEL || "llama3",
 
+  // Maximum number of tokens the model is allowed to generate per reply
+  // (Ollama's "num_predict"). undefined by default — Ollama then falls
+  // back to its own default (model-dependent, often unbounded until it
+  // decides to stop on its own), so this only takes effect if you set it.
+  ollamaMaxTokens: process.env.OLLAMA_MAX_TOKENS
+    ? Number(process.env.OLLAMA_MAX_TOKENS)
+    : undefined,
+
+  ollamaMaxContext: process.env.OLLAMA_MAX_CONTEXT
+    ? Number(process.env.OLLAMA_MAX_CONTEXT)
+    : 4096,
+
   // Model specialized in generating text embeddings (vectors), used for
   // document search (RAG). Different from the chat model.
   // Must be pulled beforehand: `ollama pull nomic-embed-text`
-  ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
+  ollamaEmbeddingModel:
+    process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
 
   // --- Example config for comparison with OpenAI (paid) ---
   // The key is secret: it only lives in .env, never in code or in git.

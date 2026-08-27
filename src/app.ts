@@ -9,6 +9,8 @@ import type { ErrorRequestHandler } from "express";
 import cors from "cors";
 import { chatRouter } from "./routes/chat.routes.js";
 import { documentRouter } from "./routes/document.routes.js";
+import { agentRouter } from "./routes/agent.routes.js";
+import { apiRateLimiter } from "./middlewares/rate-limit.middleware.js";
 
 export const app = express();
 
@@ -26,9 +28,15 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// Caps how many requests a single IP can make to any /api/* route in a
+// time window (see rate-limit.middleware.ts). Placed before the routers
+// so it runs on every request under /api, regardless of which one.
+app.use("/api", apiRateLimiter);
+
 // All chat routes are grouped under the /api prefix
 app.use("/api", chatRouter);
 app.use("/api", documentRouter);
+app.use("/api", agentRouter);
 
 // Error middleware: catches upload problems (invalid file type, file too
 // large) and returns a proper JSON response instead of Express throwing a

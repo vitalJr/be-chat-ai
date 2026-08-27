@@ -20,12 +20,10 @@ const conversations = new Map<string, Message[]>();
 // every conversation "is born" empty the first time it's used.
 function getOrCreateHistory(conversationId: string): Message[] {
   let history = conversations.get(conversationId);
-
   if (!history) {
     history = [];
     conversations.set(conversationId, history);
   }
-
   return history;
 }
 

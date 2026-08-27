@@ -8,14 +8,18 @@ import {
   handleClearChat,
   handleGetHistory,
 } from "../controllers/chat.controller.js";
+import { ollamaRateLimiter } from "../middlewares/rate-limit.middleware.js";
 
 export const chatRouter = Router();
 
 // POST /api/chat  ->  body: { "message": "your question here" }
-chatRouter.post("/chat", handleChat);
+// ollamaRateLimiter here is stricter than the general one applied to all
+// of /api in app.ts — this endpoint actually calls Ollama, so it gets its
+// own tighter budget on top.
+chatRouter.post("/chat", ollamaRateLimiter, handleChat);
 
 // POST /api/chat/stream  ->  same as /chat, but the response arrives in chunks
-chatRouter.post("/chat/stream", handleChatStream);
+chatRouter.post("/chat/stream", ollamaRateLimiter, handleChatStream);
 
 // DELETE /api/chat  ->  clears the history and starts a new conversation
 chatRouter.delete("/chat", handleClearChat);

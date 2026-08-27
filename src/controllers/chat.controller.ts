@@ -19,7 +19,7 @@ import {
   searchRelevantChunks,
   buildContextFromChunks,
 } from "../services/vectorstore/vectorstore.service.js";
-import { chatGraph } from "../services/chat.graph.js";
+import { DEFAULT_AGENT_ID, getAgent } from "../services/agent-registry.js";
 
 // Once history passes this number of messages, the oldest ones get summarized
 const MAX_MESSAGES_BEFORE_SUMMARY = 10;
@@ -50,12 +50,28 @@ function resolveConversationId(req: Request): string {
   return DEFAULT_CONVERSATION_ID;
 }
 
+// Same "optional parameter, sane default" pattern as
+// resolveConversationId, but for picking which agent (see
+// agent-registry.ts) handles the message. Whoever never sends
+// ?agentId=... keeps getting the RAG-capable default agent, unchanged
+// from before agents existed.
+function resolveAgentId(req: Request): string {
+  const raw = req.query.agentId;
+
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    return raw;
+  }
+
+  return DEFAULT_AGENT_ID;
+}
+
 export async function handleChat(
   req: Request<{}, {}, ChatRequestBody>,
   res: Response,
 ) {
   const { message } = req.body;
   const conversationId = resolveConversationId(req);
+  const agentId = resolveAgentId(req);
 
   // Simple validation: without a message, there's nothing to ask the AI
   if (!message || typeof message !== "string") {
@@ -63,20 +79,25 @@ export async function handleChat(
       error: 'Please send a "message" field (text) in the request body.',
     });
   }
+
+  // Look up the requested agent BEFORE touching history — an invalid
+  // agentId shouldn't leave an orphaned user message with no reply behind.
+  const agent = getAgent(agentId);
+  if (!agent) {
+    return res.status(400).json({
+      error: `Unknown agentId "${agentId}". See GET /api/agents for the available options.`,
+    });
+  }
+  console.log({ conversationId });
   try {
     // 1) Store the user's question in THIS conversation's history
     addMessage(conversationId, "user", message);
 
-    // 2) Run the retrieve -> generate graph (see chat.graph.ts) over this
-    //    conversation's ENTIRE history. The graph handles both searching
-    //    the uploaded documents for relevant chunks (RAG) and asking
-    //    Ollama for a reply — the same two steps this controller used to
-    //    call directly, now expressed as an explicit graph instead of
-    //    two separate function calls.
-    const result = await chatGraph.invoke({
-      messages: getHistory(conversationId),
-    });
-    const reply = result.reply;
+    // 2) Run the chosen agent (see agent-registry.ts / src/agents/) over
+    //    this conversation's ENTIRE history. What happens inside — RAG,
+    //    plain chat, or anything else a future agent adds — is entirely
+    //    up to that agent; this controller doesn't need to know.
+    const reply = await agent.invoke(getHistory(conversationId));
 
     // 3) Store the AI's response too, so it enters the context of the next question
     addMessage(conversationId, "assistant", reply);
@@ -85,7 +106,7 @@ export async function handleChat(
     //    (this happens "after" responding, so it doesn't make the user wait)
     await summarizeHistoryIfNeeded(conversationId);
 
-    return res.json({ reply, conversationId });
+    return res.json({ reply, conversationId, agentId: agent.id });
   } catch (error) {
     const err = error as Error;
     console.error("Error querying Ollama:", err.message);
@@ -94,7 +115,11 @@ export async function handleChat(
 }
 
 // Same as handleChat, but returns the response in CHUNKS as the AI
-// generates them, instead of making the client wait for the full text to be ready.
+// generates them, instead of making the client wait for the full text to
+// be ready. NOT agent-aware yet — always runs the document-assistant's
+// RAG behavior directly, ignoring ?agentId=.... Streaming an arbitrary
+// agent's graph would need each agent to expose a streaming variant of
+// invoke(), which is out of scope for now.
 export async function handleChatStream(
   req: Request<{}, {}, ChatRequestBody>,
   res: Response,
