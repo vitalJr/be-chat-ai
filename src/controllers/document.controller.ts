@@ -1,7 +1,9 @@
 import type { Request, Response } from "express";
-import { listDocuments } from "../services/document/document.store.js";
 import { loadAndSplitDocument } from "../services/document/document-loader.service.js";
-import { addDocumentChunks } from "../services/vectorstore/vectorstore.service.js";
+import {
+  addDocumentChunks,
+  listIndexedSources,
+} from "../services/vectorstore/vectorstore.service.js";
 
 export async function handleUploadDocument(req: Request, res: Response) {
   if (!req.file) {
@@ -15,7 +17,7 @@ export async function handleUploadDocument(req: Request, res: Response) {
 
   try {
     const chunks = await loadAndSplitDocument(
-      req.file.path,
+      req.file.buffer,
       req.file.mimetype,
       req.file.originalname,
     );
@@ -31,10 +33,9 @@ export async function handleUploadDocument(req: Request, res: Response) {
 
   return res.status(201).json({
     message: indexed
-      ? "File saved and processed — the AI can now query it."
-      : "File saved, but there was a problem processing its content.",
+      ? "File processed — the AI can now query it for this session."
+      : "There was a problem processing the file's content.",
     file: {
-      name: req.file.filename,
       originalName: req.file.originalname,
       sizeInBytes: req.file.size,
       mimeType: req.file.mimetype,
@@ -45,5 +46,5 @@ export async function handleUploadDocument(req: Request, res: Response) {
 }
 
 export function handleListDocuments(req: Request, res: Response) {
-  return res.json({ documents: listDocuments() });
+  return res.json({ documents: listIndexedSources() });
 }
