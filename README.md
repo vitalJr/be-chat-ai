@@ -45,7 +45,7 @@ ollama-chat-api/
 │       ├── ai/
 │       │   └── openai.service.ts       # Equivalent example using OpenAI (paid)
 │       ├── conversation/
-│       │   └── conversation.store.ts   # Stores conversation history in memory
+│       │   └── conversation.store.ts   # Stores conversation history in SQLite (survives restarts)
 │       ├── document/
 │       │   └── document-loader.service.ts  # Extracts text from PDF/DOC/DOCX and splits it into chunks
 │       └── vectorstore/
@@ -101,7 +101,7 @@ A request always flows as: **route → controller → agent/service**.
   Always uses the `document-assistant` agent's RAG behavior — not
   agent-selectable yet (see "Agents" below).
 - `DELETE /api/chat` — clears the conversation history
-- `GET /api/chat/history` — shows the history stored in memory (debug)
+- `GET /api/chat/history` — shows the conversation's stored history (debug)
 - `GET /api/agents` — lists every available agent
 - `GET /health` — checks whether the server is up
 
@@ -190,6 +190,11 @@ curl -X POST "http://localhost:3000/api/chat?conversationId=bruno" \
 Each `conversationId` has its own history, isolated from the others, and
 is shared across whichever agents you use within it. If you don't send
 this parameter, everything falls into a `"default"` conversation.
+
+Conversation history is stored in a local SQLite database
+(`conversations.db` by default — see `CONVERSATION_DB_PATH` in
+`.env.example`) and **survives a server restart**, unlike the RAG index
+and uploaded documents (see "Document upload" below).
 
 ## Document upload
 

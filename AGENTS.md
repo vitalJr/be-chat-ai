@@ -69,15 +69,22 @@ Naming should carry as much of the "what" as possible on its own.
 
 ## In-memory state
 
-`conversation.store.ts` and `vectorstore.service.ts` hold state in a
-`Map`/object in process memory — **not** in a database. Uploaded
-documents follow the same rule: `upload.middleware.ts` uses multer's
-in-memory storage, so a file is read, indexed, and discarded — it's
-never written to disk. This is intentional for the project's current
-stage (restarting the server wipes everything, including any indexed
-documents — there's nothing on disk to rebuild from). If real
-persistence is ever added, that's a deliberate architecture change —
-don't bundle it with smaller unrelated changes.
+`vectorstore.service.ts` holds the RAG index in a plain object in
+process memory — **not** in a database. Uploaded documents follow the
+same rule: `upload.middleware.ts` uses multer's in-memory storage, so a
+file is read, indexed, and discarded — it's never written to disk.
+Restarting the server wipes the RAG index completely; there's nothing on
+disk to rebuild it from.
+
+`conversation.store.ts` is the one exception: it's backed by SQLite
+(`node:sqlite`, no external dependency), so conversation history
+survives a restart — see `CONVERSATION_DB_PATH` in `.env.example`. Tests
+use `:memory:` automatically (detected via `process.env.VITEST`), so
+`npm test` never touches the real database file.
+
+If real persistence is added anywhere else (e.g. the RAG index), that's
+a deliberate architecture change — don't bundle it with smaller
+unrelated changes.
 
 ## Configuration
 
@@ -100,11 +107,10 @@ npm test            # vitest run
 Test coverage only reaches pure, dependency-free logic so far — no
 mocking setup exists yet for Ollama's `fetch` calls, LangChain's loaders,
 or Express request/response objects. Covered: `buildContextFromChunks`
-(`vectorstore.service.test.ts`), `conversation.store.ts`'s in-memory
-history operations, and `guessMimeType`
-(`document-loader.service.test.ts`). Everything that touches Ollama, the
-filesystem, or HTTP still relies on manual testing with `curl` (examples
-in the README) against a local Ollama instance
+(`vectorstore.service.test.ts`) and `conversation.store.ts`'s SQLite-backed
+history operations (using `:memory:` during tests). Everything that
+touches Ollama, document loading, or HTTP still relies on manual testing
+with `curl` (examples in the README) against a local Ollama instance
 (`ollama serve`). Add new `*.test.ts` files next to the code they cover
 as coverage grows.
 

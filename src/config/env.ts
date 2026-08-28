@@ -11,6 +11,7 @@ export interface AppConfig {
   openaiApiKey: string;
   openaiModel: string;
   serpApiKey: string;
+  conversationDbPath: string;
 }
 
 export const config: AppConfig = {
@@ -37,4 +38,9 @@ export const config: AppConfig = {
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
 
   serpApiKey: process.env.SERPAPI_API_KEY || "",
+
+  conversationDbPath:
+    process.env.VITEST === "true"
+      ? ":memory:"
+      : process.env.CONVERSATION_DB_PATH || "conversations.db",
 };
