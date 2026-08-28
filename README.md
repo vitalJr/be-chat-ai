@@ -12,14 +12,13 @@ conventions, if you're contributing.
 
 ```
 ollama-chat-api/
-├── index.ts                        # Entry point: reindexes uploaded docs, then starts the server
+├── index.ts                        # Entry point: starts the server
 ├── tsconfig.json                   # TypeScript configuration
 ├── src/
 │   ├── app.ts                      # Assembles Express (middlewares + routes)
 │   ├── types.ts                    # Shared types (e.g. Message)
 │   ├── config/
-│   │   ├── env.ts                  # Reads environment variables (.env)
-│   │   └── uploads.ts              # Where uploaded files are stored
+│   │   └── env.ts                  # Reads environment variables (.env)
 │   ├── routes/
 │   │   ├── chat.routes.ts          # Chat URLs
 │   │   ├── document.routes.ts      # Document upload URLs
@@ -29,7 +28,7 @@ ollama-chat-api/
 │   │   ├── document.controller.ts  # Receives the upload request
 │   │   └── agent.controller.ts     # Lists available agents
 │   ├── middlewares/
-│   │   ├── upload.middleware.ts    # Configures multer (file validation/saving)
+│   │   ├── upload.middleware.ts    # Configures multer (in-memory, no disk storage)
 │   │   └── rate-limit.middleware.ts # Caps requests per IP
 │   ├── agents/                     # One file per agent — see "Agents" below
 │   │   ├── agent.types.ts          # The AgentDefinition contract every agent implements
@@ -48,11 +47,9 @@ ollama-chat-api/
 │       ├── conversation/
 │       │   └── conversation.store.ts   # Stores conversation history in memory
 │       ├── document/
-│       │   ├── document.store.ts           # Lists saved documents; reindexes them on startup
 │       │   └── document-loader.service.ts  # Extracts text from PDF/DOC/DOCX and splits it into chunks
 │       └── vectorstore/
 │           └── vectorstore.service.ts  # Semantic search index (RAG) with LangChain
-├── uploads/                        # Where uploaded files are saved
 ```
 
 A request always flows as: **route → controller → agent/service**.
@@ -197,16 +194,19 @@ this parameter, everything falls into a `"default"` conversation.
 ## Document upload
 
 - `POST /api/documents` — uploads a `.pdf`, `.doc`, or `.docx` file
-  (`file` field, `multipart/form-data`). 10 MB limit per file.
+  (`file` field, `multipart/form-data`). 10 MB limit per file. The file
+  is read into memory, indexed, and then discarded — **nothing is saved
+  to disk**.
   ```bash
   curl -X POST http://localhost:3000/api/documents \
     -F "file=@/path/to/file.pdf"
   ```
-- `GET /api/documents` — lists the files already saved in `uploads/`
+- `GET /api/documents` — lists the documents currently indexed in memory
+  for this session
 
 ## RAG: the AI querying your documents
 
-When you upload a document, besides saving it in `uploads/`, the backend:
+When you upload a document, the backend:
 
 1. **Extracts the text** (`document-loader.service.ts`, using LangChain's
    *loaders*: `PDFLoader` for PDF, `DocxLoader` for DOC/DOCX)
@@ -238,10 +238,11 @@ relevant information and hand it over as context at response time.
 > You need to have the embedding model pulled: `ollama pull nomic-embed-text`
 > (the same command as always, just a different model).
 
-The index itself lives **in memory** — but unlike before, restarting the
-server no longer loses access to already-uploaded documents: on startup,
-`reindexExistingDocuments()` re-reads and re-indexes everything already
-sitting in `uploads/`, so nothing needs to be re-uploaded by hand.
+The index lives **in memory only**, and so do the documents themselves —
+nothing is written to disk at any point. Restarting the server wipes the
+index completely; there's nothing left to rebuild it from. Every new
+session starts empty, and any document you want the AI to query needs to
+be uploaded again.
 
 ## Rate limiting
 

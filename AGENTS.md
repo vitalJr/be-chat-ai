@@ -70,10 +70,14 @@ Naming should carry as much of the "what" as possible on its own.
 ## In-memory state
 
 `conversation.store.ts` and `vectorstore.service.ts` hold state in a
-`Map`/object in process memory — **not** in a database. This is
-intentional for the project's current stage (restarting the server wipes
-everything). If real persistence is ever added, that's a deliberate
-architecture change — don't bundle it with smaller unrelated changes.
+`Map`/object in process memory — **not** in a database. Uploaded
+documents follow the same rule: `upload.middleware.ts` uses multer's
+in-memory storage, so a file is read, indexed, and discarded — it's
+never written to disk. This is intentional for the project's current
+stage (restarting the server wipes everything, including any indexed
+documents — there's nothing on disk to rebuild from). If real
+persistence is ever added, that's a deliberate architecture change —
+don't bundle it with smaller unrelated changes.
 
 ## Configuration
 
@@ -111,5 +115,4 @@ as coverage grows.
 - Don't swap the in-memory `MemoryVectorStore`/`Map` for a real database
   "in passing" — that's an architecture decision, discuss it first.
 - Don't add comments back into the code — see "Comments" above.
-- Don't commit `.env`, `uploads/`, or `dist/` (already covered by
-  `.gitignore`).
+- Don't commit `.env` or `dist/` (already covered by `.gitignore`).

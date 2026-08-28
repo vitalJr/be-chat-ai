@@ -24,6 +24,13 @@ export async function addDocumentChunks(chunks: Document[]): Promise<void> {
   await vectorStore.addVectors(vectors, chunks);
 }
 
+export function listIndexedSources(): string[] {
+  const sources = vectorStore.memoryVectors.map(
+    (vector) => String(vector.metadata.source ?? "unknown"),
+  );
+  return Array.from(new Set(sources));
+}
+
 export async function searchRelevantChunks(
   query: string,
   k = 2,
