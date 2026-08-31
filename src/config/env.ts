@@ -11,6 +11,8 @@ export interface AppConfig {
   openaiApiKey: string;
   openaiModel: string;
   serpApiKey: string;
+  whisperModel: string;
+  whisperLanguage: string | undefined;
   conversationDbPath: string;
 }
 
@@ -38,6 +40,9 @@ export const config: AppConfig = {
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
 
   serpApiKey: process.env.SERPAPI_API_KEY || "",
+
+  whisperModel: process.env.WHISPER_MODEL || "Xenova/whisper-base",
+  whisperLanguage: process.env.WHISPER_LANGUAGE || undefined,
 
   conversationDbPath:
     process.env.VITEST === "true"

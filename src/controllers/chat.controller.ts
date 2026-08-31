@@ -14,6 +14,7 @@ import {
   buildContextFromChunks,
 } from "../services/vectorstore/vectorstore.service.js";
 import { DEFAULT_AGENT_ID, getAgent } from "../services/agent-registry.js";
+import { transcribeAudio } from "../services/speech/speech-to-text.service.js";
 
 const MAX_MESSAGES_BEFORE_SUMMARY = 10;
 const RECENT_MESSAGES_TO_KEEP = 4;
@@ -44,19 +45,49 @@ function resolveAgentId(req: Request): string {
   return DEFAULT_AGENT_ID;
 }
 
+type ResolvedMessage = { message: string } | { error: string };
+
+async function resolveIncomingMessage(
+  req: Request<{}, {}, ChatRequestBody>,
+): Promise<ResolvedMessage> {
+  if (req.file) {
+    try {
+      const transcribed = await transcribeAudio(req.file.buffer);
+
+      if (!transcribed || transcribed.trim().length === 0) {
+        return { error: "Could not transcribe any speech from the audio sent." };
+      }
+
+      return { message: transcribed };
+    } catch (error) {
+      const err = error as Error;
+      return { error: `Error transcribing audio: ${err.message}` };
+    }
+  }
+
+  const { message } = req.body;
+  if (message && typeof message === "string") {
+    return { message };
+  }
+
+  return {
+    error:
+      'Please send a "message" field (text) or an "audio" file (form-data) in the request.',
+  };
+}
+
 export async function handleChat(
   req: Request<{}, {}, ChatRequestBody>,
   res: Response,
 ) {
-  const { message } = req.body;
   const conversationId = resolveConversationId(req);
   const agentId = resolveAgentId(req);
 
-  if (!message || typeof message !== "string") {
-    return res.status(400).json({
-      error: 'Please send a "message" field (text) in the request body.',
-    });
+  const resolved = await resolveIncomingMessage(req);
+  if ("error" in resolved) {
+    return res.status(400).json({ error: resolved.error });
   }
+  const { message } = resolved;
 
   const agent = getAgent(agentId);
   if (!agent) {
@@ -74,7 +105,7 @@ export async function handleChat(
 
     await summarizeHistoryIfNeeded(conversationId);
 
-    return res.json({ reply, conversationId, agentId: agent.id });
+    return res.json({ reply, conversationId, agentId: agent.id, message });
   } catch (error) {
     const err = error as Error;
     console.error("Error querying Ollama:", err.message);
@@ -86,14 +117,13 @@ export async function handleChatStream(
   req: Request<{}, {}, ChatRequestBody>,
   res: Response,
 ) {
-  const { message } = req.body;
   const conversationId = resolveConversationId(req);
 
-  if (!message || typeof message !== "string") {
-    return res.status(400).json({
-      error: 'Please send a "message" field (text) in the request body.',
-    });
+  const resolved = await resolveIncomingMessage(req);
+  if ("error" in resolved) {
+    return res.status(400).json({ error: resolved.error });
   }
+  const { message } = resolved;
 
   addMessage(conversationId, "user", message);
 
