@@ -29,6 +29,7 @@ ollama-chat-api/
 │   │   └── agent.controller.ts     # Lists available agents
 │   ├── middlewares/
 │   │   ├── upload.middleware.ts    # Configures multer (in-memory, no disk storage)
+│   │   ├── audio-upload.middleware.ts # Same, but for the /api/chat "audio" field
 │   │   └── rate-limit.middleware.ts # Caps requests per IP
 │   ├── agents/                     # One file per agent — see "Agents" below
 │   │   ├── agent.types.ts          # The AgentDefinition contract every agent implements
@@ -44,6 +45,8 @@ ollama-chat-api/
 │       │   └── ollama.service.ts       # Talks to Ollama (via LangChain's ChatOllama)
 │       ├── ai/
 │       │   └── openai.service.ts       # Equivalent example using OpenAI (paid)
+│       ├── speech/
+│       │   └── speech-to-text.service.ts # Transcribes audio locally with Whisper (free, no API key)
 │       ├── conversation/
 │       │   └── conversation.store.ts   # Stores conversation history in SQLite (survives restarts)
 │       ├── document/
@@ -91,7 +94,7 @@ A request always flows as: **route → controller → agent/service**.
 
    Expected response:
    ```json
-   { "reply": "Node.js is a runtime environment...", "conversationId": "default", "agentId": "document-assistant" }
+   { "reply": "Node.js is a runtime environment...", "conversationId": "default", "agentId": "document-assistant", "message": "Explain what Node.js is in one sentence" }
    ```
 
 ## Other endpoints
@@ -107,6 +110,44 @@ A request always flows as: **route → controller → agent/service**.
 
 Requests beyond the configured rate limit get a `429` response (see
 "Rate limiting" below).
+
+## Voice input (audio → text)
+
+`POST /api/chat` and `POST /api/chat/stream` also accept an audio file
+instead of a `message` field. Send it as `multipart/form-data` under the
+`audio` key; the backend transcribes it locally with Whisper
+(`speech-to-text.service.ts`, via [@huggingface/transformers](https://huggingface.co/docs/transformers.js))
+before handing the text to the agent, same as if you had typed it. 100%
+free, no API key, no account — runs on your own CPU. Accepted formats:
+`webm`, `ogg`, `wav`, `mp3`, `mp4`, `m4a` (up to 25 MB, decoded with the
+bundled `ffmpeg-static` binary).
+
+The Whisper model (`WHISPER_MODEL` in `.env`, default
+`Xenova/whisper-base`, ~150 MB) downloads automatically from Hugging Face
+on the first transcription and is cached in `.cache/transformers/` —
+that first request is slow (and needs internet once); every request
+after that runs offline and takes about a second per short clip on a
+modern CPU.
+
+```bash
+curl -X POST http://localhost:3000/api/chat \
+  -F "audio=@/path/to/recording.webm"
+```
+
+The response includes the transcribed text in the `message` field, so
+the client can show the user what was understood:
+
+```json
+{ "reply": "...", "conversationId": "default", "agentId": "document-assistant", "message": "Explain what Node.js is in one sentence" }
+```
+
+You can still send plain JSON with a `message` field as before — the two
+input modes are mutually exclusive per request.
+
+Set `WHISPER_LANGUAGE` in `.env` (e.g. `portuguese`) to match the
+language you'll be speaking. Without it, Whisper defaults to English —
+the `@huggingface/transformers` implementation doesn't auto-detect the
+spoken language yet.
 
 ## Agents
 
