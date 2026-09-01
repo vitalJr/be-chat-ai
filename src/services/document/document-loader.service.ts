@@ -21,7 +21,7 @@ export async function loadAndSplitDocument(
   const rawDocuments = await loadRawDocument(blob, mimeType);
 
   const documentsWithSource = rawDocuments.map((doc) => {
-    doc.metadata = { ...doc.metadata, source: sourceName };
+    doc.metadata = { source: sourceName };
     return doc;
   });
 

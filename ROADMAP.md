@@ -14,7 +14,8 @@ conceito por trás, não só "ter a feature".
 - Upload de documentos PDF/DOC/DOCX (`/api/documents`)
 - **RAG** (Retrieval-Augmented Generation): extração de texto, chunking,
   embeddings (`nomic-embed-text`) e busca semântica com LangChain
-  (`document-loader.service.ts`, `vectorstore.service.ts`)
+  (`document-loader.service.ts`, `vectorstore.service.ts`), com índice
+  vetorial persistente em **Chroma** (sobrevive a um restart do servidor)
 - **Múltiplas conversas (conversationId)** — `conversation.store.ts` usa um
   `Map<conversationId, Message[]>`; todos os endpoints de chat aceitam
   `?conversationId=...` na URL, caindo numa conversa `"default"` se omitido
@@ -44,10 +45,6 @@ conceito por trás, não só "ter a feature".
       documentos grandes isso pode demorar. Alternativa: responder
       "recebido, processando..." na hora e deixar o cliente consultar
       `GET /api/documents` pra ver quando `indexed` vira `true`.
-- [ ] **Vector store persistente** — o índice do RAG
-      (`vectorstore.service.ts`) é `MemoryVectorStore`: some ao reiniciar
-      o servidor. Trocar por algo como **Chroma** (roda local e grátis,
-      parecido com o Ollama) resolve isso.
 - [ ] **Autenticação simples** — proteger a API com uma chave
       (header `x-api-key`), já que hoje qualquer um na rede local pode
       usar.
@@ -68,9 +65,8 @@ conceito por trás, não só "ter a feature".
 
 ## Notas
 
-- Prioridade sugerida: **Zod → PromptTemplate → vector store
-  persistente → Tools/Agentes**. Os dois primeiros são baratos de
-  aprender e não exigem infraestrutura nova; os últimos são o salto de
-  "chat que responde" pra "assistente que age".
+- Prioridade sugerida: **Zod → PromptTemplate → Tools/Agentes**. O
+  primeiro é barato de aprender e não exige infraestrutura nova; o
+  segundo é o salto de "chat que responde" pra "assistente que age".
 - Este arquivo é só um guia — atualize conforme os itens forem sendo
   feitos ou a prioridade mudar.
