@@ -1,4 +1,9 @@
-import { StateGraph, MessagesAnnotation, START, END } from "@langchain/langgraph";
+import {
+  StateGraph,
+  MessagesAnnotation,
+  START,
+  END,
+} from "@langchain/langgraph";
 import { ToolNode, toolsCondition } from "@langchain/langgraph/prebuilt";
 import { ChatOllama } from "@langchain/ollama";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -8,6 +13,7 @@ export function buildToolCallingGraph(tools: StructuredToolInterface[]) {
   const chatModel = new ChatOllama({
     model: config.ollamaToolModel,
     baseUrl: config.ollamaUrl,
+    numCtx: config.ollamaMaxContext,
     temperature: 0.3,
   }).bindTools(tools);
 

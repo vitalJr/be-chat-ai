@@ -33,7 +33,7 @@ export async function handleUploadDocument(req: Request, res: Response) {
 
   return res.status(201).json({
     message: indexed
-      ? "File processed — the AI can now query it for this session."
+      ? "File processed — the AI can now query it."
       : "There was a problem processing the file's content.",
     file: {
       originalName: req.file.originalname,
@@ -45,6 +45,6 @@ export async function handleUploadDocument(req: Request, res: Response) {
   });
 }
 
-export function handleListDocuments(req: Request, res: Response) {
-  return res.json({ documents: listIndexedSources() });
+export async function handleListDocuments(req: Request, res: Response) {
+  return res.json({ documents: await listIndexedSources() });
 }

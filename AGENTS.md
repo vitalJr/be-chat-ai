@@ -67,24 +67,23 @@ writing or editing code here, even to explain something non-obvious;
 keep it in the PR description, commit message, or conversation instead.
 Naming should carry as much of the "what" as possible on its own.
 
-## In-memory state
+## Persistence
 
-`vectorstore.service.ts` holds the RAG index in a plain object in
-process memory — **not** in a database. Uploaded documents follow the
-same rule: `upload.middleware.ts` uses multer's in-memory storage, so a
-file is read, indexed, and discarded — it's never written to disk.
-Restarting the server wipes the RAG index completely; there's nothing on
-disk to rebuild it from.
+`conversation.store.ts` is backed by SQLite (`node:sqlite`, no external
+dependency), so conversation history survives a restart — see
+`CONVERSATION_DB_PATH` in `.env.example`. Tests use `:memory:`
+automatically (detected via `process.env.VITEST`), so `npm test` never
+touches the real database file.
 
-`conversation.store.ts` is the one exception: it's backed by SQLite
-(`node:sqlite`, no external dependency), so conversation history
-survives a restart — see `CONVERSATION_DB_PATH` in `.env.example`. Tests
-use `:memory:` automatically (detected via `process.env.VITEST`), so
-`npm test` never touches the real database file.
+`vectorstore.service.ts` holds the RAG index in **Chroma Cloud**, a
+hosted vector database (`CHROMA_API_KEY`/`CHROMA_TENANT`/`CHROMA_DATABASE`
+in `.env.example`) — see "How to run" in the README. It also survives a
+restart; only the original uploaded file itself is transient
+(`upload.middleware.ts` uses multer's in-memory storage — a file is
+read, indexed, and discarded, never written to disk).
 
-If real persistence is added anywhere else (e.g. the RAG index), that's
-a deliberate architecture change — don't bundle it with smaller
-unrelated changes.
+If real persistence is added anywhere else, that's a deliberate
+architecture change — don't bundle it with smaller unrelated changes.
 
 ## Configuration
 

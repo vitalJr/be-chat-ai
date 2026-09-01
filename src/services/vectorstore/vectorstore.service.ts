@@ -1,4 +1,5 @@
-import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
+import { Chroma } from "@langchain/community/vectorstores/chroma";
+import { CloudClient } from "chromadb";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import type { Document } from "@langchain/core/documents";
 import { config } from "../../config/env.js";
@@ -8,10 +9,23 @@ const embeddings = new OllamaEmbeddings({
   baseUrl: config.ollamaUrl,
 });
 
-const vectorStore = new MemoryVectorStore(embeddings);
+const chromaClient = new CloudClient({
+  apiKey: config.chromaApiKey,
+  tenant: config.chromaTenant,
+  database: config.chromaDatabase,
+  ...(config.chromaHost ? { host: config.chromaHost } : {}),
+});
+
+const vectorStore = new Chroma(embeddings, {
+  index: chromaClient,
+  collectionName: config.chromaCollectionName,
+  collectionMetadata: { "hnsw:space": "cosine" },
+});
 
 const MIN_RELEVANCE_SCORE = 0.5;
-const MAX_CANDIDATES_TO_SCORE = 1000;
+const MAX_CANDIDATES_TO_SCORE = 300;
+const TOTAL_CHUNK_BUDGET = 12;
+const MIN_CHUNKS_PER_SOURCE = 2;
 
 const DOCUMENT_EMBEDDING_PREFIX = "search_document: ";
 const QUERY_EMBEDDING_PREFIX = "search_query: ";
@@ -24,17 +38,18 @@ export async function addDocumentChunks(chunks: Document[]): Promise<void> {
   await vectorStore.addVectors(vectors, chunks);
 }
 
-export function listIndexedSources(): string[] {
-  const sources = vectorStore.memoryVectors.map(
-    (vector) => String(vector.metadata.source ?? "unknown"),
+export async function listIndexedSources(): Promise<string[]> {
+  const collection = await vectorStore.ensureCollection();
+  const { metadatas } = await collection.get({ include: ["metadatas"] });
+
+  const sources = metadatas.map((metadata) =>
+    String(metadata?.source ?? "unknown"),
   );
+
   return Array.from(new Set(sources));
 }
 
-export async function searchRelevantChunks(
-  query: string,
-  k = 2,
-): Promise<Document[]> {
+export async function searchRelevantChunks(query: string): Promise<Document[]> {
   const queryVector = await embeddings.embedQuery(
     `${QUERY_EMBEDDING_PREFIX}${query}`,
   );
@@ -43,15 +58,31 @@ export async function searchRelevantChunks(
     MAX_CANDIDATES_TO_SCORE,
   );
 
+  const relevantChunks = scoredChunks
+    .map(([chunk, cosineDistance]) => ({
+      chunk,
+      similarityScore: 1 - cosineDistance,
+    }))
+    .filter(({ similarityScore }) => similarityScore >= MIN_RELEVANCE_SCORE);
+
+  const distinctSources = new Set(
+    relevantChunks.map(({ chunk }) =>
+      String(chunk.metadata.source ?? "unknown"),
+    ),
+  ).size;
+
+  const chunksPerSource = Math.max(
+    MIN_CHUNKS_PER_SOURCE,
+    Math.floor(TOTAL_CHUNK_BUDGET / distinctSources),
+  );
+
   const relevantChunksBySource = new Map<string, Document[]>();
 
-  for (const [chunk, score] of scoredChunks) {
-    if (score < MIN_RELEVANCE_SCORE) continue;
-
+  for (const { chunk } of relevantChunks) {
     const source = String(chunk.metadata.source ?? "unknown");
     const chunksForSource = relevantChunksBySource.get(source) ?? [];
 
-    if (chunksForSource.length < k) {
+    if (chunksForSource.length < chunksPerSource) {
       chunksForSource.push(chunk);
       relevantChunksBySource.set(source, chunksForSource);
     }

@@ -14,6 +14,11 @@ export interface AppConfig {
   whisperModel: string;
   whisperLanguage: string | undefined;
   conversationDbPath: string;
+  chromaHost: string | undefined;
+  chromaApiKey: string;
+  chromaTenant: string;
+  chromaDatabase: string;
+  chromaCollectionName: string;
 }
 
 export const config: AppConfig = {
@@ -31,7 +36,7 @@ export const config: AppConfig = {
 
   ollamaMaxContext: process.env.OLLAMA_MAX_CONTEXT
     ? Number(process.env.OLLAMA_MAX_CONTEXT)
-    : 4096,
+    : 8192,
 
   ollamaEmbeddingModel:
     process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
@@ -48,4 +53,11 @@ export const config: AppConfig = {
     process.env.VITEST === "true"
       ? ":memory:"
       : process.env.CONVERSATION_DB_PATH || "conversations.db",
+
+  chromaHost: process.env.CHROMA_HOST || undefined,
+  chromaApiKey: process.env.CHROMA_API_KEY || "",
+  chromaTenant: process.env.CHROMA_TENANT || "",
+  chromaDatabase: process.env.CHROMA_DATABASE || "",
+  chromaCollectionName:
+    process.env.CHROMA_COLLECTION_NAME || "ollama-chat-api-documents",
 };

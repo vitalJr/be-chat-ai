@@ -52,7 +52,7 @@ ollama-chat-api/
 │       ├── document/
 │       │   └── document-loader.service.ts  # Extracts text from PDF/DOC/DOCX and splits it into chunks
 │       └── vectorstore/
-│           └── vectorstore.service.ts  # Semantic search index (RAG) with LangChain
+│           └── vectorstore.service.ts  # Semantic search index (RAG) with LangChain + Chroma Cloud
 ```
 
 A request always flows as: **route → controller → agent/service**.
@@ -78,14 +78,21 @@ A request always flows as: **route → controller → agent/service**.
    ollama serve
    ```
 
-4. Start the API (runs the TypeScript directly, no build needed):
+4. Create a free [Chroma Cloud](https://www.trychroma.com) account and
+   database — this is the vector database used for RAG (see "RAG"
+   below). Copy `CHROMA_API_KEY`, `CHROMA_TENANT`, and `CHROMA_DATABASE`
+   from your database's "sdk" tab into `.env` — see `.env.example` for
+   where. You only need this if you're going to upload documents (RAG);
+   the rest of the API works without it.
+
+5. Start the API (runs the TypeScript directly, no build needed):
    ```bash
    npm start
    ```
    During development, use `npm run dev` instead — it restarts
    automatically on every file change.
 
-5. Test it with curl (in another terminal):
+6. Test it with curl (in another terminal):
    ```bash
    curl -X POST http://localhost:3000/api/chat \
      -H "Content-Type: application/json" \
@@ -240,15 +247,15 @@ and uploaded documents (see "Document upload" below).
 ## Document upload
 
 - `POST /api/documents` — uploads a `.pdf`, `.doc`, or `.docx` file
-  (`file` field, `multipart/form-data`). 10 MB limit per file. The file
-  is read into memory, indexed, and then discarded — **nothing is saved
-  to disk**.
+  (`file` field, `multipart/form-data`). 10 MB limit per file. The
+  original file itself is only ever held in memory and discarded after
+  indexing — **the raw file is never saved to disk** — but the extracted
+  chunks and their embeddings are, in Chroma (see "RAG" below).
   ```bash
   curl -X POST http://localhost:3000/api/documents \
     -F "file=@/path/to/file.pdf"
   ```
-- `GET /api/documents` — lists the documents currently indexed in memory
-  for this session
+- `GET /api/documents` — lists the documents currently indexed
 
 ## RAG: the AI querying your documents
 
@@ -262,8 +269,9 @@ When you upload a document, the backend:
    for each piece, using Ollama's `nomic-embed-text` model — prefixed
    with `"search_document: "`, the task prefix that model expects for
    text being indexed (as opposed to text doing the searching)
-4. **Stores everything in an in-memory index** (`vectorstore.service.ts`,
-   using LangChain's `MemoryVectorStore`)
+4. **Stores everything in Chroma Cloud** (`vectorstore.service.ts`, via
+   LangChain's `Chroma` vector store + the `CloudClient` from `chromadb`)
+   — a hosted vector database, see step 4 in "How to run"
 
 Every time you send a message to `/api/chat` (via the `document-assistant`
 agent) or `/api/chat/stream`, the backend embeds your question (prefixed
@@ -284,11 +292,16 @@ relevant information and hand it over as context at response time.
 > You need to have the embedding model pulled: `ollama pull nomic-embed-text`
 > (the same command as always, just a different model).
 
-The index lives **in memory only**, and so do the documents themselves —
-nothing is written to disk at any point. Restarting the server wipes the
-index completely; there's nothing left to rebuild it from. Every new
-session starts empty, and any document you want the AI to query needs to
-be uploaded again.
+The index **survives a server restart** (and even a full reinstall on a
+different machine) — it's stored in your Chroma Cloud database, not in
+the Node process's memory. Documents you uploaded stay searchable across
+restarts; you only need to re-upload if you delete the collection on
+Chroma Cloud's side. (This changed recently — earlier versions of this
+project used an in-memory index that reset on every restart.)
+
+> Chroma Cloud has a free tier with limited storage/usage — check
+> [trychroma.com/pricing](https://www.trychroma.com/pricing) if you plan
+> to index a lot of documents.
 
 ## Rate limiting
 
