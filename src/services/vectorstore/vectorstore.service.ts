@@ -9,18 +9,26 @@ const embeddings = new OllamaEmbeddings({
   baseUrl: config.ollamaUrl,
 });
 
-const chromaClient = new CloudClient({
-  apiKey: config.chromaApiKey,
-  tenant: config.chromaTenant,
-  database: config.chromaDatabase,
-  ...(config.chromaHost ? { host: config.chromaHost } : {}),
-});
+let vectorStore: Chroma | undefined;
 
-const vectorStore = new Chroma(embeddings, {
-  index: chromaClient,
-  collectionName: config.chromaCollectionName,
-  collectionMetadata: { "hnsw:space": "cosine" },
-});
+function getVectorStore(): Chroma {
+  if (!vectorStore) {
+    const chromaClient = new CloudClient({
+      apiKey: config.chromaApiKey,
+      tenant: config.chromaTenant,
+      database: config.chromaDatabase,
+      ...(config.chromaHost ? { host: config.chromaHost } : {}),
+    });
+
+    vectorStore = new Chroma(embeddings, {
+      index: chromaClient,
+      collectionName: config.chromaCollectionName,
+      collectionMetadata: { "hnsw:space": "cosine" },
+    });
+  }
+
+  return vectorStore;
+}
 
 const MIN_RELEVANCE_SCORE = 0.5;
 const MAX_CANDIDATES_TO_SCORE = 300;
@@ -35,11 +43,11 @@ export async function addDocumentChunks(chunks: Document[]): Promise<void> {
     (chunk) => `${DOCUMENT_EMBEDDING_PREFIX}${chunk.pageContent}`,
   );
   const vectors = await embeddings.embedDocuments(prefixedTexts);
-  await vectorStore.addVectors(vectors, chunks);
+  await getVectorStore().addVectors(vectors, chunks);
 }
 
 export async function listIndexedSources(): Promise<string[]> {
-  const collection = await vectorStore.ensureCollection();
+  const collection = await getVectorStore().ensureCollection();
   const { metadatas } = await collection.get({ include: ["metadatas"] });
 
   const sources = metadatas.map((metadata) =>
@@ -53,7 +61,7 @@ export async function searchRelevantChunks(query: string): Promise<Document[]> {
   const queryVector = await embeddings.embedQuery(
     `${QUERY_EMBEDDING_PREFIX}${query}`,
   );
-  const scoredChunks = await vectorStore.similaritySearchVectorWithScore(
+  const scoredChunks = await getVectorStore().similaritySearchVectorWithScore(
     queryVector,
     MAX_CANDIDATES_TO_SCORE,
   );
