@@ -5,8 +5,7 @@ import { askOllamaChat } from "../services/ollama/ollama.service.js";
 
 const PERSONA_INSTRUCTIONS =
   "You are a translator. No matter what language the user writes in, or " +
-  "what they ask, translate their exact message into English and reply " +
-  "with ONLY the translation — no explanations, no extra commentary.";
+  "what they ask, translate their exact message into English and reply, no extra comments. ";
 
 const ChatState = Annotation.Root({
   messages: Annotation<Message[]>,

@@ -45,7 +45,9 @@ function toLangChainMessages(messages: Message[]): BaseMessage[] {
 
 function extractText(content: BaseMessage["content"]): string {
   if (typeof content !== "string") {
-    throw new Error("Expected a plain text response from the model, got a non-text message.");
+    throw new Error(
+      "Expected a plain text response from the model, got a non-text message.",
+    );
   }
   return content;
 }
@@ -57,7 +59,10 @@ export const veterinaryAssistantAgent: AgentDefinition = {
     "A helpful assistant for pet owners with questions about animal health and care. Searches the web when it isn't confident in its own answer.",
   async invoke(messages) {
     const result = await getGraph().invoke({
-      messages: [new SystemMessage(SYSTEM_PROMPT), ...toLangChainMessages(messages)],
+      messages: [
+        new SystemMessage(SYSTEM_PROMPT),
+        ...toLangChainMessages(messages),
+      ],
     });
     const last = result.messages[result.messages.length - 1];
     return extractText(last.content);

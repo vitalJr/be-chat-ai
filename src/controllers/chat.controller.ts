@@ -95,7 +95,6 @@ export async function handleChat(
       error: `Unknown agentId "${agentId}". See GET /api/agents for the available options.`,
     });
   }
-  console.log({ conversationId });
   try {
     addMessage(conversationId, "user", message);
 
