@@ -13,7 +13,7 @@ const REGISTERED_AGENTS: AgentDefinition[] = [
   webSearchAgent,
 ];
 
-export const DEFAULT_AGENT_ID = documentAssistantAgent.id;
+export const DEFAULT_AGENT_ID = generalAssistantAgent.id;
 
 const agentsById = new Map<string, AgentDefinition>(
   REGISTERED_AGENTS.map((agent) => [agent.id, agent]),

@@ -35,7 +35,7 @@ ollama-chat-api/
 │   │   ├── agent.types.ts          # The AgentDefinition contract every agent implements
 │   │   ├── tool-calling-graph.ts   # Shared generate<->tools loop, reused by any agent that needs tools
 │   │   ├── document-assistant.agent.ts  # RAG: searches your documents before answering
-│   │   ├── general-assistant.agent.ts   # Plain chat, no document search
+│   │   ├── general-assistant.agent.ts   # Tool-calling: docs, web search, or delegates to veterinary-assistant
 │   │   ├── translator.agent.ts          # Persona-only agent: always replies in English
 │   │   ├── veterinary-assistant.agent.ts # Pet health & care, searches the web as a fallback
 │   │   └── web-search.agent.ts          # Searches the web (SerpAPI) when it needs to
@@ -175,7 +175,7 @@ Currently registered:
 | `agentId` | What it does |
 |---|---|
 | `document-assistant` (default) | Searches your uploaded documents for relevant context before answering (RAG). Falls back to plain chat when nothing relevant is found. |
-| `general-assistant` | Plain chat, no document search — answers only from the model's own knowledge. |
+| `general-assistant` | Plain chat that decides on its own whether to search your uploaded documents, search the web, or consult `veterinary-assistant` — instead of always searching first like `document-assistant`, or needing a specific `agentId` like `web-search`/`veterinary-assistant`. Uses tool-calling, so it needs `OLLAMA_TOOL_MODEL` — see "Tool calling" below. |
 | `translator` | Translates whatever you write into English, ignoring everything else the message asks for. |
 | `veterinary-assistant` | Answers questions about pet health, nutrition, behavior, and care. Searches the web when it isn't confident in its own answer. |
 | `web-search` | Searches the web (SerpAPI) when it needs current or specific information to answer. |
@@ -186,6 +186,7 @@ curl -X POST "http://localhost:3000/api/chat?agentId=general-assistant" \
   -H "Content-Type: application/json" \
   -d '{"message": "Hi there"}'
 ```
+(needs `OLLAMA_TOOL_MODEL` set — see "Tool calling" below)
 
 If you don't send `agentId`, you get `document-assistant` — identical to
 the behavior before agents existed. An unknown `agentId` returns `400`.
@@ -194,24 +195,34 @@ the behavior before agents existed. An unknown `agentId` returns `400`.
 `AgentDefinition`, then list it in `REGISTERED_AGENTS` in
 `src/services/agent-registry.ts`. Nothing else needs to change.
 
-## Tool calling (web search)
+## Tool calling
 
 `web-search` and `veterinary-assistant` can call a real tool — a web
 search via [SerpAPI](https://serpapi.com) — instead of only answering
-from what the model already knows. The model itself decides, per
-message, whether it needs to search or can answer directly; there's no
-code forcing the tool to run.
+from what the model already knows. `general-assistant` goes further: it
+can call `document-assistant`'s document search, and can also delegate
+the whole question to `web-search` or `veterinary-assistant` as
+sub-agents (each one it's own tool, calling that agent's `invoke(...)`
+directly — see `general-assistant.agent.ts`). In every case, the model
+itself decides, per message, whether it needs a tool or can answer
+directly; there's no code forcing it to run.
 
-This needs two things `.env` doesn't set by default:
+All four need `OLLAMA_TOOL_MODEL` set in `.env` — the plain
+`OLLAMA_MODEL` (`llama3` by default) doesn't reliably support tool
+calling. Pull a model that does (e.g. `ollama pull llama3.2`) and set
+`OLLAMA_TOOL_MODEL=llama3.2`.
 
-- **`OLLAMA_TOOL_MODEL`** — the plain `OLLAMA_MODEL` (`llama3` by
-  default) doesn't reliably support tool calling. Pull a model that does
-  (e.g. `ollama pull llama3.2`) and set `OLLAMA_TOOL_MODEL=llama3.2`.
-- **`SERPAPI_API_KEY`** — free tier available at
-  [serpapi.com](https://serpapi.com), key at
-  [serpapi.com/manage-api-key](https://serpapi.com/manage-api-key).
-  Without it, these two agents return an error when called; every other
-  agent keeps working normally.
+`web-search` and `veterinary-assistant` also need **`SERPAPI_API_KEY`**
+— free tier available at [serpapi.com](https://serpapi.com), key at
+[serpapi.com/manage-api-key](https://serpapi.com/manage-api-key).
+Without it, those two agents fail on *every* message (not just ones that
+need a search), because both build their `SerpAPI` tool eagerly at graph
+construction time. This also affects `general-assistant` indirectly:
+asking it something that makes it delegate to `web-search` or
+`veterinary-assistant` fails too, even if the sub-agent could have
+answered from its own knowledge without searching — but `general-assistant`
+itself, and its own document-search tool, work fine without the key, as
+does everything it can answer directly.
 
 The tool-calling loop itself (ask the model → run the tool if it asked
 for one → ask again with the result → repeat until it answers) lives
