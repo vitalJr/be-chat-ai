@@ -1,9 +1,11 @@
 import { tool } from "@langchain/core/tools";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { z } from "zod";
 import {
   AIMessage,
   HumanMessage,
   SystemMessage,
+  ToolMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
 import type { Message } from "../types.js";
@@ -40,31 +42,29 @@ const SYSTEM_PROMPT =
   "what you translated.";
 
 const searchDocumentsTool = tool(
-  async ({ query }: { query: string }) => {
+  async ({ query }: { query: string }, config: RunnableConfig) => {
     console.log("searchDocumentsTool");
-    const chunks = await searchRelevantChunks(query);
+    const userId = config.configurable?.userId as string;
+    const chunks = await searchRelevantChunks(query, userId);
     return buildContextFromChunks(chunks) ?? "No relevant documents found.";
   },
   {
     name: "search_documents",
     description:
-      "Always use this FIRST whenever the user refers to something they " +
-      "sent/uploaded — phrases like 'no documento que te enviei', 'my " +
-      "resume/CV', 'the file I uploaded', 'meu currículo'. This applies " +
-      "even if the topic (e.g. a company or person name) sounds like " +
-      "something you could search the web for instead — the user's own " +
-      "document always takes priority over web search when they " +
-      "reference something they gave you.",
+      "Use when the user need to search some information in their uploaded documents. Do NOT use this when the user needs to search the web — use web_search for that instead.",
     schema: z.object({ query: z.string() }),
   },
 );
 
 const webSearchTool = tool(
-  async ({ query }: { query: string }) => {
+  async ({ query }: { query: string }, config: RunnableConfig) => {
     console.log("webSearchTool");
-    const result = await webSearchAgent.invoke([
-      { role: "user", content: query },
-    ]);
+    const userId = config.configurable?.userId as string;
+    const result = await webSearchAgent.invoke(
+      [{ role: "user", content: query }],
+      userId,
+    );
+    console.log("webSearchTool result:", result);
     return result;
   },
   {
@@ -78,11 +78,13 @@ const webSearchTool = tool(
 );
 
 const translatorAssisntantTool = tool(
-  async ({ query }: { query: string }) => {
+  async ({ query }: { query: string }, config: RunnableConfig) => {
     console.log("translatorAssisntantTool");
-    const result = await translatorAgent.invoke([
-      { role: "user", content: query },
-    ]);
+    const userId = config.configurable?.userId as string;
+    const result = await translatorAgent.invoke(
+      [{ role: "user", content: query }],
+      userId,
+    );
     return result;
   },
   {
@@ -96,11 +98,13 @@ const translatorAssisntantTool = tool(
 );
 
 const veterinaryAssistantTool = tool(
-  async ({ query }: { query: string }) => {
+  async ({ query }: { query: string }, config: RunnableConfig) => {
     console.log("veterinaryAssistantTool");
-    const result = await veterinaryAssistantAgent.invoke([
-      { role: "user", content: query },
-    ]);
+    const userId = config.configurable?.userId as string;
+    const result = await veterinaryAssistantAgent.invoke(
+      [{ role: "user", content: query }],
+      userId,
+    );
     return result;
   },
   {
@@ -146,19 +150,34 @@ function extractText(content: BaseMessage["content"]): string {
   return content;
 }
 
+function findFinalToolMessage(messages: BaseMessage[]): ToolMessage | undefined {
+  const last = messages[messages.length - 1];
+  if (!(last instanceof AIMessage)) return undefined;
+
+  const beforeLast = messages[messages.length - 2];
+  return beforeLast instanceof ToolMessage ? beforeLast : undefined;
+}
+
 export const generalAssistantAgent: AgentDefinition = {
   id: "general-assistant",
   name: "General Assistant",
   description:
-    "Plain chat that decides on its own whether to search your uploaded " +
-    "documents, search the web, or consult the veterinary-assistant.",
-  async invoke(messages) {
-    const result = await getGraph().invoke({
-      messages: [
-        new SystemMessage(SYSTEM_PROMPT),
-        ...toLangChainMessages(messages),
-      ],
-    });
+    "A general-purpose assistant that can answer questions, provide information, and assist with a variety of tasks. It can search the user's uploaded documents, search the web, translate text, and provide veterinary assistance.",
+  async invoke(messages, userId) {
+    const result = await getGraph().invoke(
+      {
+        messages: [
+          new SystemMessage(SYSTEM_PROMPT),
+          ...toLangChainMessages(messages),
+        ],
+      },
+      { configurable: { userId } },
+    );
+    console.log("generalAssistantAgent result:", result);
+    const finalToolMessage = findFinalToolMessage(result.messages);
+    if (finalToolMessage) {
+      return extractText(finalToolMessage.content);
+    }
     const last = result.messages[result.messages.length - 1];
     return extractText(last.content);
   },

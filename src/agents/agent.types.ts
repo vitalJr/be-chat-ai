@@ -4,5 +4,5 @@ export interface AgentDefinition {
   id: string;
   name: string;
   description: string;
-  invoke(messages: Message[]): Promise<string>;
+  invoke(messages: Message[], userId: string): Promise<string>;
 }
