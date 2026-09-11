@@ -21,13 +21,15 @@ const SYSTEM_PROMPT =
   "You are a helpful assistant. You can answer question, provide information, and assist the user with a variaty f tasks. you have access to the following tools:\n\n" +
   "- search_documents: Search the user's uploaded documents for relevant information.\n" +
   "- web_search: Search the web for relevant information.\n" +
-  "- translator: Translate any text into English.\n" +
+  "- translator: Translate a piece of text into English.\n" +
   "- veterinary_assistant: Assist with veterinary-related questions.\n\n" +
   "When you respond, you must use the tools when appropriate. If the user " +
   "asks a question that can be answered by searching their uploaded documents, " +
   "use the search_documents tool. If the user asks a question that can be answered " +
-  "by searching the web, use the web_search tool. If the user sends a message in a " +
-  "language other than English, use the translator tool to translate it into English. Just translate the texte when its needed, if the user aske for it " +
+  "by searching the web, use the web_search tool. Respond directly in whatever " +
+  "language the user writes in — you understand many languages, so do NOT use " +
+  "the translator tool just because a message isn't in English. Only use the " +
+  "translator tool when the user explicitly asks you to translate something. " +
   "If the user has a question about their pet's health, behavior, or care, use the " +
   "veterinary_assistant tool to provide assistance.\n\n" +
   "If you don't need to use a tool, respond with a plain text message.\n\n" +
@@ -39,21 +41,27 @@ const SYSTEM_PROMPT =
 
 const searchDocumentsTool = tool(
   async ({ query }: { query: string }) => {
+    console.log("searchDocumentsTool");
     const chunks = await searchRelevantChunks(query);
     return buildContextFromChunks(chunks) ?? "No relevant documents found.";
   },
   {
     name: "search_documents",
     description:
-      "Search the user's uploaded documents for relevant information. " +
-      "Use this whenever the question could be answered by something the " +
-      "user uploaded.",
+      "Always use this FIRST whenever the user refers to something they " +
+      "sent/uploaded — phrases like 'no documento que te enviei', 'my " +
+      "resume/CV', 'the file I uploaded', 'meu currículo'. This applies " +
+      "even if the topic (e.g. a company or person name) sounds like " +
+      "something you could search the web for instead — the user's own " +
+      "document always takes priority over web search when they " +
+      "reference something they gave you.",
     schema: z.object({ query: z.string() }),
   },
 );
 
 const webSearchTool = tool(
   async ({ query }: { query: string }) => {
+    console.log("webSearchTool");
     const result = await webSearchAgent.invoke([
       { role: "user", content: query },
     ]);
@@ -62,14 +70,16 @@ const webSearchTool = tool(
   {
     name: "web_search",
     description:
-      "Search the web for relevant information. Use this whenever the " +
-      "question could be answered by something on the web.",
+      "Search the web for current or general information. Do NOT use " +
+      "this when the user refers to a document they sent/uploaded — use " +
+      "search_documents for that instead.",
     schema: z.object({ query: z.string() }),
   },
 );
 
 const translatorAssisntantTool = tool(
   async ({ query }: { query: string }) => {
+    console.log("translatorAssisntantTool");
     const result = await translatorAgent.invoke([
       { role: "user", content: query },
     ]);
@@ -78,13 +88,16 @@ const translatorAssisntantTool = tool(
   {
     name: "translator",
     description:
-      "Translate any text into English. Use this whenever the user sends a message in a language other than English.",
+      "Translate a piece of text into English. Use this ONLY when the " +
+      "user explicitly asks you to translate something — never just " +
+      "because their own message happens to be in another language.",
     schema: z.object({ query: z.string() }),
   },
 );
 
 const veterinaryAssistantTool = tool(
   async ({ query }: { query: string }) => {
+    console.log("veterinaryAssistantTool");
     const result = await veterinaryAssistantAgent.invoke([
       { role: "user", content: query },
     ]);

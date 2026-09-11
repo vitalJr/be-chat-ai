@@ -1,6 +1,7 @@
 import type { AgentDefinition } from "../agents/agent.types.js";
 import { documentAssistantAgent } from "../agents/document-assistant.agent.js";
 import { generalAssistantAgent } from "../agents/general-assistant.agent.js";
+import { routerAssistantAgent } from "../agents/router-assistant.agent.js";
 import { translatorAgent } from "../agents/translator.agent.js";
 import { veterinaryAssistantAgent } from "../agents/veterinary-assistant.agent.js";
 import { webSearchAgent } from "../agents/web-search.agent.js";
@@ -8,12 +9,14 @@ import { webSearchAgent } from "../agents/web-search.agent.js";
 const REGISTERED_AGENTS: AgentDefinition[] = [
   documentAssistantAgent,
   generalAssistantAgent,
+  routerAssistantAgent,
   translatorAgent,
   veterinaryAssistantAgent,
   webSearchAgent,
 ];
 
 export const DEFAULT_AGENT_ID = generalAssistantAgent.id;
+// export const DEFAULT_AGENT_ID = routerAssistantAgent.id;
 
 const agentsById = new Map<string, AgentDefinition>(
   REGISTERED_AGENTS.map((agent) => [agent.id, agent]),
