@@ -19,6 +19,14 @@ conceito por trás, não só "ter a feature".
 - **Múltiplas conversas (conversationId)** — `conversation.store.ts` usa um
   `Map<conversationId, Message[]>`; todos os endpoints de chat aceitam
   `?conversationId=...` na URL, caindo numa conversa `"default"` se omitido
+- **Function calling / Tools** — `general-assistant` decide sozinho,
+  via tool-calling, se pesquisa documentos, pesquisa a web, ou delega a
+  pergunta a outro agente (`veterinary-assistant`) como sub-agente
+  (`tool-calling-graph.ts`, `buildToolCallingGraph`)
+- **Subgrafos do LangGraph** — `router-assistant` compõe grafos
+  compilados diretamente como nós de outro grafo, com estado partilhado,
+  em vez de usar tools — roteamento decidido em código
+  (`addConditionalEdges`), não pelo modelo
 - Frontend em Next.js pra testar tudo isso visualmente
 
 ## 🔜 Próximos passos — fácil
@@ -51,11 +59,6 @@ conceito por trás, não só "ter a feature".
 
 ## 🔜 Próximos passos — avançado
 
-- [ ] **Function calling / Tools (Agentes)** — deixar a IA **decidir
-      chamar uma função sua** durante a conversa (ex: consultar o clima,
-      rodar uma query no banco) em vez de só gerar texto. É o próximo
-      passo natural depois do exemplo de SQL Agent que já vimos
-      (`SqlToolkit` + `createSqlAgent` do LangChain).
 - [ ] **Visão (imagens)** — trocar/baixar um modelo multimodal (ex:
       `llava`) e permitir enviar imagens junto da pergunta.
 - [ ] **Observabilidade (LangSmith)** — ferramenta pra "ver por dentro"
@@ -65,8 +68,9 @@ conceito por trás, não só "ter a feature".
 
 ## Notas
 
-- Prioridade sugerida: **Zod → PromptTemplate → Tools/Agentes**. O
-  primeiro é barato de aprender e não exige infraestrutura nova; o
-  segundo é o salto de "chat que responde" pra "assistente que age".
+- Prioridade sugerida: **Zod → PromptTemplate**. Ambos são baratos de
+  aprender e não exigem infraestrutura nova — o salto de "chat que
+  responde" pra "assistente que age" (Tools/Agentes, subgrafos) já foi
+  dado.
 - Este arquivo é só um guia — atualize conforme os itens forem sendo
   feitos ou a prioridade mudar.
