@@ -4,7 +4,9 @@ import cors from "cors";
 import { chatRouter } from "./routes/chat.routes.js";
 import { documentRouter } from "./routes/document.routes.js";
 import { agentRouter } from "./routes/agent.routes.js";
+import { authRouter } from "./routes/auth.routes.js";
 import { apiRateLimiter } from "./middlewares/rate-limit.middleware.js";
+import { requireAuth } from "./middlewares/auth.middleware.js";
 
 export const app = express();
 
@@ -17,6 +19,10 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api", apiRateLimiter);
+
+app.use("/api", authRouter);
+
+app.use("/api", requireAuth);
 
 app.use("/api", chatRouter);
 app.use("/api", documentRouter);
