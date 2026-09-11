@@ -36,6 +36,7 @@ ollama-chat-api/
 │   │   ├── tool-calling-graph.ts   # Shared generate<->tools loop, reused by any agent that needs tools
 │   │   ├── document-assistant.agent.ts  # RAG: searches your documents before answering
 │   │   ├── general-assistant.agent.ts   # Tool-calling: docs, web search, or delegates to veterinary-assistant
+│   │   ├── router-assistant.agent.ts    # Real subgraph composition: code-routed to a RAG or plain-chat subgraph
 │   │   ├── translator.agent.ts          # Persona-only agent: always replies in English
 │   │   ├── veterinary-assistant.agent.ts # Pet health & care, searches the web as a fallback
 │   │   └── web-search.agent.ts          # Searches the web (SerpAPI) when it needs to
@@ -45,6 +46,8 @@ ollama-chat-api/
 │       │   └── ollama.service.ts       # Talks to Ollama (via LangChain's ChatOllama)
 │       ├── ai/
 │       │   └── openai.service.ts       # Equivalent example using OpenAI (paid)
+│       ├── anthropic/
+│       │   └── anthropic.service.ts    # Equivalent example using Claude, via @langchain/anthropic (paid)
 │       ├── speech/
 │       │   └── speech-to-text.service.ts # Transcribes audio locally with Whisper (free, no API key)
 │       ├── conversation/
@@ -176,6 +179,7 @@ Currently registered:
 |---|---|
 | `document-assistant` (default) | Searches your uploaded documents for relevant context before answering (RAG). Falls back to plain chat when nothing relevant is found. |
 | `general-assistant` | Plain chat that decides on its own whether to search your uploaded documents, search the web, or consult `veterinary-assistant` — instead of always searching first like `document-assistant`, or needing a specific `agentId` like `web-search`/`veterinary-assistant`. Uses tool-calling, so it needs `OLLAMA_TOOL_MODEL` — see "Tool calling" below. |
+| `router-assistant` | Classifies your question in code (not via tool-calling) and routes to one of two **compiled subgraphs** that share the same graph state — a RAG subgraph or a plain-chat subgraph. See "Subgraph composition" below. |
 | `translator` | Translates whatever you write into English, ignoring everything else the message asks for. |
 | `veterinary-assistant` | Answers questions about pet health, nutrition, behavior, and care. Searches the web when it isn't confident in its own answer. |
 | `web-search` | Searches the web (SerpAPI) when it needs current or specific information to answer. |
@@ -229,6 +233,28 @@ for one → ask again with the result → repeat until it answers) lives
 once in `src/agents/tool-calling-graph.ts`, as `buildToolCallingGraph(tools)`.
 Any agent that needs tools calls this with its own list of tools instead
 of reimplementing the loop.
+
+## Subgraph composition
+
+`router-assistant` demonstrates a different way of combining smaller
+pieces into one agent — real **LangGraph subgraphs**, not tools. The
+difference from "Tool calling" above:
+
+- **Tools** (`general-assistant`, etc.): the model itself decides, via
+  `bindTools`, whether to call another agent — that agent runs as an
+  opaque function (a string question in, a string answer out), with no
+  access to the parent's graph state.
+- **Subgraphs** (`router-assistant`): a `classify` node decides the
+  route **in code**, via `addConditionalEdges` — never the model
+  choosing a tool. The route leads to one of two **compiled `StateGraph`s
+  passed directly as nodes** (`.addNode("rag", ragSubgraph)`), sharing
+  the exact same state definition as the parent graph, so fields like
+  `extraContext` flow between parent and subgraph with no extra mapping.
+
+See `router-assistant.agent.ts` for the full graph — it composes a RAG
+subgraph (`retrieve` → `generate`, reusing `searchRelevantChunks` /
+`buildContextFromChunks`) and a plain-chat subgraph, wired together by
+one `classify` node at the top.
 
 ## Multiple conversations
 
