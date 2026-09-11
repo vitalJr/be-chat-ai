@@ -9,6 +9,7 @@ import {
 
 const RouterState = Annotation.Root({
   messages: Annotation<Message[]>,
+  userId: Annotation<string>,
   extraContext: Annotation<string | undefined>,
   route: Annotation<"rag" | "chat">,
   reply: Annotation<string>,
@@ -18,7 +19,7 @@ const ragSubgraph = new StateGraph(RouterState)
   .addNode("retrieve", async (state) => {
     console.log("entrou aqui 2");
     const lastMessage = state.messages[state.messages.length - 1];
-    const chunks = await searchRelevantChunks(lastMessage.content);
+    const chunks = await searchRelevantChunks(lastMessage.content, state.userId);
     return { extraContext: buildContextFromChunks(chunks) };
   })
   .addNode("generate", async (state) => {
@@ -85,9 +86,9 @@ export const routerAssistantAgent: AgentDefinition = {
     "routes to one of two compiled subgraphs (RAG or plain chat) that " +
     "share the same graph state — routing decided by code " +
     "(addConditionalEdges), not by the model choosing a tool.",
-  async invoke(messages) {
+  async invoke(messages, userId) {
     console.log("entrou aqui 1");
-    const result = await graph.invoke({ messages });
+    const result = await graph.invoke({ messages, userId });
     return result.reply;
   },
 };

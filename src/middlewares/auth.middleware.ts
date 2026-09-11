@@ -1,7 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../services/auth/auth.service.js";
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest<
+  P = Record<string, string>,
+  ResBody = unknown,
+  ReqBody = unknown,
+  ReqQuery = Record<string, unknown>,
+> extends Request<P, ResBody, ReqBody, ReqQuery> {
   user?: { id: string; username: string };
 }
 

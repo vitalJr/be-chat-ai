@@ -9,6 +9,7 @@ import {
 
 const ChatState = Annotation.Root({
   messages: Annotation<Message[]>,
+  userId: Annotation<string>,
   extraContext: Annotation<string | undefined>,
   reply: Annotation<string>,
 });
@@ -17,7 +18,10 @@ async function retrieve(
   state: typeof ChatState.State,
 ): Promise<Partial<typeof ChatState.State>> {
   const lastMessage = state.messages[state.messages.length - 1];
-  const relevantChunks = await searchRelevantChunks(lastMessage.content);
+  const relevantChunks = await searchRelevantChunks(
+    lastMessage.content,
+    state.userId,
+  );
   const extraContext = buildContextFromChunks(relevantChunks);
 
   return { extraContext };
@@ -43,8 +47,8 @@ export const documentAssistantAgent: AgentDefinition = {
   name: "Document Assistant",
   description:
     "Searches your uploaded documents for relevant context before answering (RAG). Falls back to plain chat when nothing relevant is found.",
-  async invoke(messages) {
-    const result = await graph.invoke({ messages });
+  async invoke(messages, userId) {
+    const result = await graph.invoke({ messages, userId });
     return result.reply;
   },
 };

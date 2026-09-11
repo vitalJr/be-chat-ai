@@ -38,17 +38,27 @@ const MIN_CHUNKS_PER_SOURCE = 2;
 const DOCUMENT_EMBEDDING_PREFIX = "search_document: ";
 const QUERY_EMBEDDING_PREFIX = "search_query: ";
 
-export async function addDocumentChunks(chunks: Document[]): Promise<void> {
-  const prefixedTexts = chunks.map(
+export async function addDocumentChunks(
+  chunks: Document[],
+  userId: string,
+): Promise<void> {
+  const stampedChunks = chunks.map((chunk) => ({
+    ...chunk,
+    metadata: { ...chunk.metadata, userId },
+  }));
+  const prefixedTexts = stampedChunks.map(
     (chunk) => `${DOCUMENT_EMBEDDING_PREFIX}${chunk.pageContent}`,
   );
   const vectors = await embeddings.embedDocuments(prefixedTexts);
-  await getVectorStore().addVectors(vectors, chunks);
+  await getVectorStore().addVectors(vectors, stampedChunks);
 }
 
-export async function listIndexedSources(): Promise<string[]> {
+export async function listIndexedSources(userId: string): Promise<string[]> {
   const collection = await getVectorStore().ensureCollection();
-  const { metadatas } = await collection.get({ include: ["metadatas"] });
+  const { metadatas } = await collection.get({
+    include: ["metadatas"],
+    where: { userId },
+  });
 
   const sources = metadatas.map((metadata) =>
     String(metadata?.source ?? "unknown"),
@@ -57,13 +67,17 @@ export async function listIndexedSources(): Promise<string[]> {
   return Array.from(new Set(sources));
 }
 
-export async function searchRelevantChunks(query: string): Promise<Document[]> {
+export async function searchRelevantChunks(
+  query: string,
+  userId: string,
+): Promise<Document[]> {
   const queryVector = await embeddings.embedQuery(
     `${QUERY_EMBEDDING_PREFIX}${query}`,
   );
   const scoredChunks = await getVectorStore().similaritySearchVectorWithScore(
     queryVector,
     MAX_CANDIDATES_TO_SCORE,
+    { userId },
   );
 
   const relevantChunks = scoredChunks

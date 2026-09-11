@@ -1,11 +1,15 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../middlewares/auth.middleware.js";
 import { loadAndSplitDocument } from "../services/document/document-loader.service.js";
 import {
   addDocumentChunks,
   listIndexedSources,
 } from "../services/vectorstore/vectorstore.service.js";
 
-export async function handleUploadDocument(req: Request, res: Response) {
+export async function handleUploadDocument(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
   if (!req.file) {
     return res.status(400).json({
       error: 'No file was sent. Use the "file" field in form-data.',
@@ -21,7 +25,7 @@ export async function handleUploadDocument(req: Request, res: Response) {
       req.file.mimetype,
       req.file.originalname,
     );
-    await addDocumentChunks(chunks);
+    await addDocumentChunks(chunks, req.user!.id);
     indexed = true;
   } catch (error) {
     indexError =
@@ -45,6 +49,9 @@ export async function handleUploadDocument(req: Request, res: Response) {
   });
 }
 
-export async function handleListDocuments(req: Request, res: Response) {
-  return res.json({ documents: await listIndexedSources() });
+export async function handleListDocuments(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  return res.json({ documents: await listIndexedSources(req.user!.id) });
 }

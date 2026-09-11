@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../middlewares/auth.middleware.js";
 import {
   askOllamaChatStream,
   summarizeConversation,
@@ -25,7 +26,7 @@ interface ChatRequestBody {
   message?: string;
 }
 
-function resolveConversationId(req: Request): string {
+function resolveConversationId(req: { query: Record<string, unknown> }): string {
   const raw = req.query.conversationId;
 
   if (typeof raw === "string" && raw.trim().length > 0) {
@@ -35,7 +36,7 @@ function resolveConversationId(req: Request): string {
   return DEFAULT_CONVERSATION_ID;
 }
 
-function resolveAgentId(req: Request): string {
+function resolveAgentId(req: { query: Record<string, unknown> }): string {
   const raw = req.query.agentId;
 
   if (typeof raw === "string" && raw.trim().length > 0) {
@@ -48,7 +49,7 @@ function resolveAgentId(req: Request): string {
 type ResolvedMessage = { message: string } | { error: string };
 
 async function resolveIncomingMessage(
-  req: Request<{}, {}, ChatRequestBody>,
+  req: AuthenticatedRequest<{}, {}, ChatRequestBody>,
 ): Promise<ResolvedMessage> {
   if (req.file) {
     try {
@@ -77,9 +78,10 @@ async function resolveIncomingMessage(
 }
 
 export async function handleChat(
-  req: Request<{}, {}, ChatRequestBody>,
+  req: AuthenticatedRequest<{}, {}, ChatRequestBody>,
   res: Response,
 ) {
+  const userId = req.user!.id;
   const conversationId = resolveConversationId(req);
   const agentId = resolveAgentId(req);
 
@@ -96,13 +98,13 @@ export async function handleChat(
     });
   }
   try {
-    addMessage(conversationId, "user", message);
+    addMessage(userId, conversationId, "user", message);
 
-    const reply = await agent.invoke(getHistory(conversationId));
+    const reply = await agent.invoke(getHistory(userId, conversationId), userId);
 
-    addMessage(conversationId, "assistant", reply);
+    addMessage(userId, conversationId, "assistant", reply);
 
-    await summarizeHistoryIfNeeded(conversationId);
+    await summarizeHistoryIfNeeded(userId, conversationId);
 
     return res.json({ reply, conversationId, agentId: agent.id, message });
   } catch (error) {
@@ -113,9 +115,10 @@ export async function handleChat(
 }
 
 export async function handleChatStream(
-  req: Request<{}, {}, ChatRequestBody>,
+  req: AuthenticatedRequest<{}, {}, ChatRequestBody>,
   res: Response,
 ) {
+  const userId = req.user!.id;
   const conversationId = resolveConversationId(req);
 
   const resolved = await resolveIncomingMessage(req);
@@ -124,24 +127,24 @@ export async function handleChatStream(
   }
   const { message } = resolved;
 
-  addMessage(conversationId, "user", message);
+  addMessage(userId, conversationId, "user", message);
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
   try {
-    const relevantChunks = await searchRelevantChunks(message);
+    const relevantChunks = await searchRelevantChunks(message, userId);
     const extraContext = buildContextFromChunks(relevantChunks);
 
     const fullReply = await askOllamaChatStream(
-      getHistory(conversationId),
+      getHistory(userId, conversationId),
       (chunk) => {
         res.write(chunk);
       },
       extraContext,
     );
 
-    addMessage(conversationId, "assistant", fullReply);
-    await summarizeHistoryIfNeeded(conversationId);
+    addMessage(userId, conversationId, "assistant", fullReply);
+    await summarizeHistoryIfNeeded(userId, conversationId);
 
     res.end();
   } catch (error) {
@@ -155,8 +158,11 @@ export async function handleChatStream(
   }
 }
 
-async function summarizeHistoryIfNeeded(conversationId: string): Promise<void> {
-  const history = getHistory(conversationId);
+async function summarizeHistoryIfNeeded(
+  userId: string,
+  conversationId: string,
+): Promise<void> {
+  const history = getHistory(userId, conversationId);
 
   if (history.length <= MAX_MESSAGES_BEFORE_SUMMARY) {
     return;
@@ -172,7 +178,7 @@ async function summarizeHistoryIfNeeded(conversationId: string): Promise<void> {
 
   const summary = await summarizeConversation(oldMessages);
 
-  setHistory(conversationId, [
+  setHistory(userId, conversationId, [
     {
       role: "system",
       content: `Summary of the conversation so far: ${summary}`,
@@ -181,13 +187,15 @@ async function summarizeHistoryIfNeeded(conversationId: string): Promise<void> {
   ]);
 }
 
-export function handleClearChat(req: Request, res: Response) {
+export function handleClearChat(req: AuthenticatedRequest, res: Response) {
+  const userId = req.user!.id;
   const conversationId = resolveConversationId(req);
-  clearHistory(conversationId);
+  clearHistory(userId, conversationId);
   return res.json({ status: "history cleared", conversationId });
 }
 
-export function handleGetHistory(req: Request, res: Response) {
+export function handleGetHistory(req: AuthenticatedRequest, res: Response) {
+  const userId = req.user!.id;
   const conversationId = resolveConversationId(req);
-  return res.json({ conversationId, history: getHistory(conversationId) });
+  return res.json({ conversationId, history: getHistory(userId, conversationId) });
 }
