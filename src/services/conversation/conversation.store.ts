@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { config } from "../../config/env.js";
 import type { Message, Role } from "../../types.js";
 
-const db = new DatabaseSync(config.conversationDbPath);
+export const db = new DatabaseSync(config.conversationDbPath);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (

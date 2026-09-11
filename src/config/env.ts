@@ -14,6 +14,8 @@ export interface AppConfig {
   whisperModel: string;
   whisperLanguage: string | undefined;
   conversationDbPath: string;
+  jwtSecret: string;
+  jwtExpiresIn: string;
   chromaHost: string | undefined;
   chromaApiKey: string;
   chromaTenant: string;
@@ -53,6 +55,11 @@ export const config: AppConfig = {
     process.env.VITEST === "true"
       ? ":memory:"
       : process.env.CONVERSATION_DB_PATH || "conversations.db",
+
+  jwtSecret:
+    process.env.JWT_SECRET ||
+    (process.env.VITEST === "true" ? "test-secret" : ""),
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
 
   chromaHost: process.env.CHROMA_HOST || undefined,
   chromaApiKey: process.env.CHROMA_API_KEY || "",
