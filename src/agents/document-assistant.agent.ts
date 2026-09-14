@@ -1,7 +1,7 @@
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import type { Message } from "../types.js";
 import type { AgentDefinition } from "./agent.types.js";
-import { askOllamaChat } from "../services/ollama/ollama.service.js";
+import { askOllamaChat, rewriteQuery } from "../services/ollama/ollama.service.js";
 import {
   searchRelevantChunks,
   buildContextFromChunks,
@@ -18,10 +18,9 @@ async function retrieve(
   state: typeof ChatState.State,
 ): Promise<Partial<typeof ChatState.State>> {
   const lastMessage = state.messages[state.messages.length - 1];
-  const relevantChunks = await searchRelevantChunks(
-    lastMessage.content,
-    state.userId,
-  );
+  const history = state.messages.slice(0, -1);
+  const searchQuery = await rewriteQuery(history, lastMessage.content);
+  const relevantChunks = await searchRelevantChunks(searchQuery, state.userId);
   const extraContext = buildContextFromChunks(relevantChunks);
 
   return { extraContext };

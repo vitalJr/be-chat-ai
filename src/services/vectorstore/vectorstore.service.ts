@@ -3,6 +3,7 @@ import { CloudClient } from "chromadb";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import type { Document } from "@langchain/core/documents";
 import { config } from "../../config/env.js";
+import { generateHypotheticalAnswer } from "../ollama/ollama.service.js";
 
 const embeddings = new OllamaEmbeddings({
   model: config.ollamaEmbeddingModel,
@@ -36,7 +37,6 @@ const TOTAL_CHUNK_BUDGET = 12;
 const MIN_CHUNKS_PER_SOURCE = 2;
 
 const DOCUMENT_EMBEDDING_PREFIX = "search_document: ";
-const QUERY_EMBEDDING_PREFIX = "search_query: ";
 
 export async function addDocumentChunks(
   chunks: Document[],
@@ -71,8 +71,9 @@ export async function searchRelevantChunks(
   query: string,
   userId: string,
 ): Promise<Document[]> {
+  const hypotheticalAnswer = await generateHypotheticalAnswer(query);
   const queryVector = await embeddings.embedQuery(
-    `${QUERY_EMBEDDING_PREFIX}${query}`,
+    `${DOCUMENT_EMBEDDING_PREFIX}${hypotheticalAnswer}`,
   );
   const scoredChunks = await getVectorStore().similaritySearchVectorWithScore(
     queryVector,

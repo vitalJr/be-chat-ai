@@ -19,6 +19,8 @@ import { webSearchAgent } from "./web-search.agent.js";
 import { veterinaryAssistantAgent } from "./veterinary-assistant.agent.js";
 import { translatorAgent } from "./translator.agent.js";
 
+const NO_RESULT_MESSAGE = "Não encontrei uma resposta para isso.";
+
 const SYSTEM_PROMPT =
   "You are a helpful assistant. You can answer question, provide information, and assist the user with a variaty f tasks. you have access to the following tools:\n\n" +
   "- search_documents: Search the user's uploaded documents for relevant information.\n" +
@@ -39,14 +41,18 @@ const SYSTEM_PROMPT =
   "response — do not rephrase, summarize, or change it. In particular, " +
   "when you use the translator tool, your final response must be ONLY " +
   "the translated text it returns — no extra sentences, no explaining " +
-  "what you translated.";
+  "what you translated.\n\n" +
+  "If none of the tools you used returned anything useful, and you don't " +
+  `genuinely know the answer yourself, reply with EXACTLY this text: "` +
+  NO_RESULT_MESSAGE +
+  '" — nothing else, no explanation, no apology.';
 
 const searchDocumentsTool = tool(
   async ({ query }: { query: string }, config: RunnableConfig) => {
     console.log("searchDocumentsTool");
     const userId = config.configurable?.userId as string;
     const chunks = await searchRelevantChunks(query, userId);
-    return buildContextFromChunks(chunks) ?? "No relevant documents found.";
+    return buildContextFromChunks(chunks) ?? NO_RESULT_MESSAGE;
   },
   {
     name: "search_documents",
@@ -158,6 +164,11 @@ function findFinalToolMessage(messages: BaseMessage[]): ToolMessage | undefined 
   return beforeLast instanceof ToolMessage ? beforeLast : undefined;
 }
 
+function isNoResultMessage(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  return normalized.length === 0 || normalized === NO_RESULT_MESSAGE.toLowerCase();
+}
+
 export const generalAssistantAgent: AgentDefinition = {
   id: "general-assistant",
   name: "General Assistant",
@@ -174,11 +185,22 @@ export const generalAssistantAgent: AgentDefinition = {
       { configurable: { userId } },
     );
     console.log("generalAssistantAgent result:", result);
-    const finalToolMessage = findFinalToolMessage(result.messages);
-    if (finalToolMessage) {
-      return extractText(finalToolMessage.content);
-    }
     const last = result.messages[result.messages.length - 1];
-    return extractText(last.content);
+    const aiText = extractText(last.content);
+
+    if (!isNoResultMessage(aiText)) {
+      return aiText;
+    }
+
+    const finalToolMessage = findFinalToolMessage(result.messages);
+    const toolText = finalToolMessage
+      ? extractText(finalToolMessage.content)
+      : undefined;
+
+    if (toolText && !isNoResultMessage(toolText)) {
+      return toolText;
+    }
+
+    return NO_RESULT_MESSAGE;
   },
 };

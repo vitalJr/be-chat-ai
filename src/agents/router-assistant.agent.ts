@@ -1,7 +1,11 @@
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import type { Message } from "../types.js";
 import type { AgentDefinition } from "./agent.types.js";
-import { askOllama, askOllamaChat } from "../services/ollama/ollama.service.js";
+import {
+  askOllama,
+  askOllamaChat,
+  rewriteQuery,
+} from "../services/ollama/ollama.service.js";
 import {
   searchRelevantChunks,
   buildContextFromChunks,
@@ -19,7 +23,9 @@ const ragSubgraph = new StateGraph(RouterState)
   .addNode("retrieve", async (state) => {
     console.log("entrou aqui 2");
     const lastMessage = state.messages[state.messages.length - 1];
-    const chunks = await searchRelevantChunks(lastMessage.content, state.userId);
+    const history = state.messages.slice(0, -1);
+    const searchQuery = await rewriteQuery(history, lastMessage.content);
+    const chunks = await searchRelevantChunks(searchQuery, state.userId);
     return { extraContext: buildContextFromChunks(chunks) };
   })
   .addNode("generate", async (state) => {
