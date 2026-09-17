@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Document } from "@langchain/core/documents";
-import { buildContextFromChunks } from "./vectorstore.service.js";
+import { buildContextFromChunks, reciprocalRankFusion } from "./vectorstore.service.js";
 
 function makeChunk(pageContent: string, source?: string): Document {
   return { pageContent, metadata: source ? { source } : {} } as Document;
+}
+
+function makeIdChunk(chunkId: string, pageContent: string): Document {
+  return { pageContent, metadata: { chunkId } } as Document;
 }
 
 describe("buildContextFromChunks", () => {
@@ -22,5 +26,44 @@ describe("buildContextFromChunks", () => {
     const context = buildContextFromChunks([makeChunk("no source here")]);
 
     expect(context).toContain("unknown document");
+  });
+});
+
+describe("reciprocalRankFusion", () => {
+  it("ranks a chunk that appears near the top of both lists above one that only appears in one", () => {
+    const a = makeIdChunk("a", "chunk a");
+    const b = makeIdChunk("b", "chunk b");
+    const c = makeIdChunk("c", "chunk c");
+
+    const vectorList = [a, b, c];
+    const keywordList = [a, c];
+
+    const result = reciprocalRankFusion([vectorList, keywordList]);
+
+    expect(result.map((chunk) => chunk.metadata.chunkId)).toEqual(["a", "c", "b"]);
+  });
+
+  it("rescues a chunk that keyword search found but vector search missed entirely", () => {
+    const missedByVector = makeIdChunk("exact-match", "contract #48291-B");
+    const foundByVector = makeIdChunk("topically-similar", "something about contracts");
+
+    const vectorList = [foundByVector];
+    const keywordList = [missedByVector];
+
+    const result = reciprocalRankFusion([vectorList, keywordList]);
+
+    expect(result.map((chunk) => chunk.metadata.chunkId)).toContain("exact-match");
+  });
+
+  it("returns an empty list when given no ranked lists", () => {
+    expect(reciprocalRankFusion([[], []])).toEqual([]);
+  });
+
+  it("falls back to pageContent as the dedup key when chunkId is missing", () => {
+    const chunk = makeChunk("same text, no id");
+
+    const result = reciprocalRankFusion([[chunk], [chunk]]);
+
+    expect(result).toHaveLength(1);
   });
 });

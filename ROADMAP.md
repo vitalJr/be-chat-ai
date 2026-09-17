@@ -101,16 +101,28 @@ parte do que já foi feito e do que ainda falta.
    (`vectorstore.service.ts`) — ataca o problema de vocabulário/formato
    diferente entre pergunta e documento, complementar ao rewriting (que
    resolve o contexto conversacional).
-3. [ ] **Sem reranking.**
-   Filtramos por score (≥0.5) e balanceamos por fonte, mas não há um
-   segundo passe (cross-encoder) reordenando os candidatos por
-   relevância real à pergunta. Busca vetorial pura erra bastante em
-   nuance — reranking é o refinamento mais citado como "próximo passo
-   depois do RAG básico".
-4. [ ] **Sem busca híbrida (keyword + vetorial).**
+3. [x] **Sem reranking.**
+   Filtrávamos por score (≥0.5) e balanceávamos por fonte, mas não havia
+   um segundo passe (cross-encoder) reordenando os candidatos por
+   relevância real à pergunta. **Feito** — `rerankChunks`
+   (`rerank.service.ts`) usa um cross-encoder local
+   (`Xenova/ms-marco-MiniLM-L-6-v2`, via `@huggingface/transformers`, a
+   mesma lib já usada pro Whisper — sem dependência nova) pra reler os
+   até 30 melhores candidatos da busca vetorial contra a pergunta real e
+   reordená-los antes do balanceamento por fonte
+   (`vectorstore.service.ts`).
+4. [x] **Sem busca híbrida (keyword + vetorial).**
    Embeddings são ótimos pra "significado", ruins pra correspondência
-   exata (números de contrato, IDs, nomes próprios exatos). Um RAG mais
-   robusto combina vetorial + BM25/keyword search.
+   exata (números de contrato, IDs, nomes próprios exatos). **Feito** —
+   `keyword-search.service.ts` mantém um índice em memória
+   ([minisearch](https://github.com/lucaong/minisearch), BM25-like, sem
+   servidor externo), preenchido a cada upload e reconstruído a partir do
+   Chroma se estiver vazio. `searchRelevantChunks`
+   (`vectorstore.service.ts`) roda as duas buscas e funde os rankings com
+   **Reciprocal Rank Fusion** antes do reranking. Nota técnica: cheguei a
+   avaliar usar FTS5 do `node:sqlite` (já usado pra conversas/usuários),
+   mas o binding experimental do Node não inclui esse módulo — testado e
+   descartado antes de implementar.
 5. [ ] **Chunking ingênuo.**
    `RecursiveCharacterTextSplitter` corta por caracteres, sem noção de
    estrutura (títulos, parágrafos, tabelas). Um PDF com tabela pode ser

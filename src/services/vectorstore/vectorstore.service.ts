@@ -1,9 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { Chroma } from "@langchain/community/vectorstores/chroma";
 import { CloudClient } from "chromadb";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import type { Document } from "@langchain/core/documents";
 import { config } from "../../config/env.js";
 import { generateHypotheticalAnswer } from "../ollama/ollama.service.js";
+import { rerankChunks } from "../rerank/rerank.service.js";
+import {
+  indexChunks,
+  isIndexEmpty,
+  searchKeywords,
+} from "../keyword-search/keyword-search.service.js";
 
 const embeddings = new OllamaEmbeddings({
   model: config.ollamaEmbeddingModel,
@@ -33,6 +40,7 @@ function getVectorStore(): Chroma {
 
 const MIN_RELEVANCE_SCORE = 0.5;
 const MAX_CANDIDATES_TO_SCORE = 300;
+const MAX_CANDIDATES_TO_RERANK = 30;
 const TOTAL_CHUNK_BUDGET = 12;
 const MIN_CHUNKS_PER_SOURCE = 2;
 
@@ -42,15 +50,17 @@ export async function addDocumentChunks(
   chunks: Document[],
   userId: string,
 ): Promise<void> {
-  const stampedChunks = chunks.map((chunk) => ({
+  const chunkIds = chunks.map(() => randomUUID());
+  const stampedChunks = chunks.map((chunk, i) => ({
     ...chunk,
-    metadata: { ...chunk.metadata, userId },
+    metadata: { ...chunk.metadata, userId, chunkId: chunkIds[i] },
   }));
   const prefixedTexts = stampedChunks.map(
     (chunk) => `${DOCUMENT_EMBEDDING_PREFIX}${chunk.pageContent}`,
   );
   const vectors = await embeddings.embedDocuments(prefixedTexts);
-  await getVectorStore().addVectors(vectors, stampedChunks);
+  await getVectorStore().addVectors(vectors, stampedChunks, { ids: chunkIds });
+  indexChunks(stampedChunks);
 }
 
 export async function listIndexedSources(userId: string): Promise<string[]> {
@@ -67,10 +77,53 @@ export async function listIndexedSources(userId: string): Promise<string[]> {
   return Array.from(new Set(sources));
 }
 
+async function ensureKeywordIndexWarm(): Promise<void> {
+  if (!isIndexEmpty()) return;
+
+  const collection = await getVectorStore().ensureCollection();
+  const { documents, metadatas } = await collection.get({
+    include: ["metadatas", "documents"],
+  });
+
+  const allChunks: Document[] = documents.map((content, i) => ({
+    pageContent: content ?? "",
+    metadata: metadatas[i] ?? {},
+  }));
+
+  indexChunks(allChunks);
+}
+
+export function reciprocalRankFusion(
+  rankedLists: Document[][],
+  k = 60,
+): Document[] {
+  const scored = new Map<string, { chunk: Document; score: number }>();
+
+  for (const list of rankedLists) {
+    list.forEach((chunk, index) => {
+      const id = String(chunk.metadata.chunkId ?? chunk.pageContent);
+      const contribution = 1 / (k + index + 1);
+      const existing = scored.get(id);
+
+      if (existing) {
+        existing.score += contribution;
+      } else {
+        scored.set(id, { chunk, score: contribution });
+      }
+    });
+  }
+
+  return Array.from(scored.values())
+    .sort((a, b) => b.score - a.score)
+    .map(({ chunk }) => chunk);
+}
+
 export async function searchRelevantChunks(
   query: string,
   userId: string,
 ): Promise<Document[]> {
+  await ensureKeywordIndexWarm();
+
   const hypotheticalAnswer = await generateHypotheticalAnswer(query);
   const queryVector = await embeddings.embedQuery(
     `${DOCUMENT_EMBEDDING_PREFIX}${hypotheticalAnswer}`,
@@ -81,17 +134,25 @@ export async function searchRelevantChunks(
     { userId },
   );
 
-  const relevantChunks = scoredChunks
+  const vectorChunks = scoredChunks
     .map(([chunk, cosineDistance]) => ({
       chunk,
       similarityScore: 1 - cosineDistance,
     }))
-    .filter(({ similarityScore }) => similarityScore >= MIN_RELEVANCE_SCORE);
+    .filter(({ similarityScore }) => similarityScore >= MIN_RELEVANCE_SCORE)
+    .map(({ chunk }) => chunk);
+
+  const keywordChunks = searchKeywords(query, userId, MAX_CANDIDATES_TO_RERANK);
+
+  const fusedChunks = reciprocalRankFusion([vectorChunks, keywordChunks]).slice(
+    0,
+    MAX_CANDIDATES_TO_RERANK,
+  );
+
+  const rerankedChunks = await rerankChunks(query, fusedChunks);
 
   const distinctSources = new Set(
-    relevantChunks.map(({ chunk }) =>
-      String(chunk.metadata.source ?? "unknown"),
-    ),
+    rerankedChunks.map((chunk) => String(chunk.metadata.source ?? "unknown")),
   ).size;
 
   const chunksPerSource = Math.max(
@@ -101,7 +162,7 @@ export async function searchRelevantChunks(
 
   const relevantChunksBySource = new Map<string, Document[]>();
 
-  for (const { chunk } of relevantChunks) {
+  for (const chunk of rerankedChunks) {
     const source = String(chunk.metadata.source ?? "unknown");
     const chunksForSource = relevantChunksBySource.get(source) ?? [];
 
