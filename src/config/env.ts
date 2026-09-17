@@ -13,6 +13,7 @@ export interface AppConfig {
   serpApiKey: string;
   whisperModel: string;
   whisperLanguage: string | undefined;
+  rerankModel: string;
   conversationDbPath: string;
   jwtSecret: string;
   jwtExpiresIn: string;
@@ -50,6 +51,8 @@ export const config: AppConfig = {
 
   whisperModel: process.env.WHISPER_MODEL || "Xenova/whisper-base",
   whisperLanguage: process.env.WHISPER_LANGUAGE || undefined,
+
+  rerankModel: process.env.RERANK_MODEL || "Xenova/ms-marco-MiniLM-L-6-v2",
 
   conversationDbPath:
     process.env.VITEST === "true"
